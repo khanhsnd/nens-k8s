@@ -1,3 +1,4 @@
+import { FIXTURE_RESOURCES } from '@/features/discovery/discovery.fixtures'
 import type { EventRecord, K8sObject, OwnerRef } from './resource.types'
 
 const NAMESPACES = ['default', 'kube-system', 'monitoring', 'ingress-nginx', 'argocd']
@@ -130,12 +131,49 @@ function makeConfigMaps(): K8sObject[] {
   }))
 }
 
+/** The CRDs behind the custom kinds of `discovery.fixtures`, so both tables agree. */
+function makeDefinitions(): K8sObject[] {
+  return FIXTURE_RESOURCES.filter((resource) => resource.custom).map((resource, index) => ({
+    apiVersion: 'apiextensions.k8s.io/v1',
+    kind: 'CustomResourceDefinition',
+    metadata: meta(`${resource.gvr.resource}.${resource.gvr.group}`, index),
+    spec: {
+      group: resource.gvr.group,
+      scope: resource.namespaced ? 'Namespaced' : 'Cluster',
+      names: { kind: resource.kind, plural: resource.gvr.resource },
+      versions: [{ name: resource.gvr.version, served: true, storage: true }],
+    },
+  }))
+}
+
+const SYNC = ['Synced', 'Synced', 'OutOfSync'] as const
+const HEALTH = ['Healthy', 'Healthy', 'Degraded', 'Progressing'] as const
+
+/** A custom kind with real printer-column values behind it. */
+function makeApplications(): K8sObject[] {
+  return APPS.map((app, index) => ({
+    apiVersion: 'argoproj.io/v1alpha1',
+    kind: 'Application',
+    metadata: meta(app, index, 'argocd'),
+    spec: { project: 'default', destination: { namespace: NAMESPACES[index % NAMESPACES.length] } },
+    status: {
+      sync: {
+        status: SYNC[Math.floor(hash(index * 11) * SYNC.length)],
+        revision: Math.floor(hash(index * 13) * 1e12).toString(16),
+      },
+      health: { status: HEALTH[Math.floor(hash(index * 19) * HEALTH.length)] },
+    },
+  }))
+}
+
 const BUILDERS: Record<string, () => K8sObject[]> = {
   pods: makePods,
   deployments: makeDeployments,
   nodes: makeNodes,
   services: makeServices,
   configmaps: makeConfigMaps,
+  definitions: makeDefinitions,
+  'crd:argoproj.io/applications': makeApplications,
 }
 
 const cache = new Map<string, K8sObject[]>()

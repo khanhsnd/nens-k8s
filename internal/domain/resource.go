@@ -59,10 +59,3 @@ type EventRecord struct {
 	Count   int64  `json:"count"`
 	Last    string `json:"last"`
 }
-
-type APIResource struct {
-	GVR        GVR      `json:"gvr"`
-	Kind       string   `json:"kind"`
-	Namespaced bool     `json:"namespaced"`
-	Verbs      []string `json:"verbs"`
-}

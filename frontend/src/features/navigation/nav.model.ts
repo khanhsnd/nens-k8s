@@ -1,16 +1,4 @@
-import {
-  Boxes,
-  Database,
-  FileCog,
-  Gauge,
-  Layers,
-  Network,
-  Puzzle,
-  ScrollText,
-  Server,
-  ShieldCheck,
-  Ship,
-} from 'lucide-react'
+import { Boxes, Database, FileCog, Gauge, Network, Puzzle, ShieldCheck, Ship } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 export type NavLeaf = {
@@ -25,6 +13,11 @@ export type NavSection = {
   children: NavLeaf[]
 }
 
+/**
+ * The curated half of the tree: which built-in kinds are worth a leaf, how they
+ * group and what they are called. Discovery decides which of them the cluster
+ * actually serves and appends its custom groups — see `nav.tree.ts`.
+ */
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: 'cluster',
@@ -117,4 +110,4 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
-export const SECTION_FALLBACK_ICONS = { Layers, ScrollText, Server }
+export const CUSTOM_SECTION_ICON = Puzzle

@@ -53,6 +53,11 @@ type ResourceSubscriber interface {
 	Unsubscribe(token string) error
 }
 
+type APIDiscovery interface {
+	Resources(ctx context.Context, clusterID string) ([]APIResource, error)
+	Refresh(ctx context.Context, clusterID string) ([]APIResource, error)
+}
+
 type ResourceEditor interface {
 	Get(ctx context.Context, ref ResourceRef) (map[string]any, error)
 	Apply(ctx context.Context, ref ResourceRef, object map[string]any) (map[string]any, error)

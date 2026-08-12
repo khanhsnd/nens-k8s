@@ -1,5 +1,6 @@
-import { ChevronRight, Plug, Settings2, Unplug, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Plug, RefreshCw, Settings2, Unplug, type LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { useDiscovery } from '@/features/discovery/discovery.store'
 import { useNav } from '@/features/navigation/nav.store'
 import { cn } from '@/shared/lib/cn'
 import { Dot, type Tone } from '@/shared/ui/Badge'
@@ -56,6 +57,7 @@ export function ClusterNode({ cluster, children }: { cluster: Cluster; children:
   const activate = useClusters((s) => s.activate)
   const connect = useClusters((s) => s.connect)
   const disconnect = useClusters((s) => s.disconnect)
+  const rediscover = useDiscovery((s) => s.refresh)
   const collapsed = useNav((s) => s.collapsedCluster === cluster.id)
   const toggleCluster = useNav((s) => s.toggleCluster)
   const [settings, setSettings] = useState(false)
@@ -132,6 +134,13 @@ export function ClusterNode({ cluster, children }: { cluster: Cluster; children:
           )}
         >
           <RowAction icon={link.icon} label={link.label} onClick={link.run} />
+          {cluster.phase === 'connected' && (
+            <RowAction
+              icon={RefreshCw}
+              label="Reload API resources"
+              onClick={() => void rediscover(cluster.id)}
+            />
+          )}
           <RowAction icon={Settings2} label="Cluster settings" onClick={() => setSettings(true)} />
         </div>
       </div>

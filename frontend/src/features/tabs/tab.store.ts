@@ -11,21 +11,26 @@ export type Tab = {
   title: string
 }
 
-type Opened = { sectionId: string; leafId: string }
+type Opened = { sectionId: string; leafId: string; title?: string }
 
-/** Null for a leaf the nav model no longer has — a saved tab can outlive it. */
-function makeTab(sectionId: string, leafId: string): Tab | null {
+/**
+ * The nav model owns the title of a built-in leaf, so renaming one renames the
+ * saved tab. A custom resource has no entry there — it carries its own title,
+ * which is also why the title is saved. Null means neither knows the leaf.
+ */
+function makeTab(sectionId: string, leafId: string, title?: string): Tab | null {
   const section = NAV_SECTIONS.find((item) => item.id === sectionId)
   const leaf = section?.children.find((item) => item.id === leafId)
-  if (!leaf) return null
+  const label = leaf?.label ?? title
+  if (!label) return null
 
-  return { id: `${sectionId}:${leafId}`, sectionId, leafId, title: leaf.label }
+  return { id: `${sectionId}:${leafId}`, sectionId, leafId, title: label }
 }
 
 type TabState = {
   tabs: Tab[]
   activeId: string | null
-  open: (sectionId: string, leafId: string) => void
+  open: (sectionId: string, leafId: string, title?: string) => void
   activate: (id: string) => void
   close: (id: string) => void
   closeOthers: (id: string) => void
@@ -35,7 +40,7 @@ type TabState = {
 function reopen(): Pick<TabState, 'tabs' | 'activeId'> {
   const saved = load<{ tabs: Opened[]; activeId: string | null }>(KEY, { tabs: [], activeId: null })
   const tabs = saved.tabs
-    .map((item) => makeTab(item.sectionId, item.leafId))
+    .map((item) => makeTab(item.sectionId, item.leafId, item.title))
     .filter((tab): tab is Tab => tab !== null)
 
   if (tabs.length === 0) {
@@ -51,9 +56,9 @@ function reopen(): Pick<TabState, 'tabs' | 'activeId'> {
 export const useTabs = create<TabState>((set) => ({
   ...reopen(),
 
-  open: (sectionId, leafId) =>
+  open: (sectionId, leafId, title) =>
     set((state) => {
-      const tab = makeTab(sectionId, leafId)
+      const tab = makeTab(sectionId, leafId, title)
       if (!tab) return state
 
       const exists = state.tabs.some((item) => item.id === tab.id)
@@ -87,7 +92,7 @@ export const useTabs = create<TabState>((set) => ({
 // and every mutation of it is worth keeping.
 useTabs.subscribe(({ tabs, activeId }) =>
   save(KEY, {
-    tabs: tabs.map(({ sectionId, leafId }) => ({ sectionId, leafId })),
+    tabs: tabs.map(({ sectionId, leafId, title }) => ({ sectionId, leafId, title })),
     activeId,
   }),
 )

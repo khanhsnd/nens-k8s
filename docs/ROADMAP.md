@@ -18,7 +18,7 @@ Table renders fixture data; falls back to fixtures when the Wails bridge is abse
 ## Phase 2 — Live resources (done)
 
 - `internal/kube/resource`: dynamic informer per (cluster, GVR, namespace), started lazily on first subscribe, ref-counted, stopped when the last subscriber leaves.
-- `ResourceAPI.Subscribe(token, clusterID, gvr, namespace)` / `Unsubscribe(token)` — the frontend supplies the token, see `DECISIONS.md`.
+- `ResourceAPI.Subscribe(token, clusterID, gvr, namespace)` / `Unsubscribe(token)` — the frontend supplies the token, see `decisions/resources.md`.
 - Informer handlers publish `resource:event` with a coalescing window (~100ms) so a 5k-pod resync is one frontend update, not 5k.
 - Frontend `features/resources/resource.store.ts`: `Map<uid, object>` per subscription, applied once per animation frame.
 - `features/resources/kinds.ts` is the columns registry: `{ gvr, namespaced, columns }` per kind.
@@ -80,10 +80,26 @@ Exit: verified against fixtures (browser dev server), the fake clientset and the
 created a real pod. xterm rendering could not be verified in the headless browser pane (it never
 composites, so `requestAnimationFrame` never fires) — the data path was verified module by module.
 
-## Phase 6 — Discovery + CRDs
+## Phase 6 — Discovery + CRDs (done)
 
-- Cache `discovery.ServerPreferredResources` per cluster; rebuild the sidebar tree from it instead of the static `nav.model.ts`.
-- Custom Resources section lists CRDs by group, with generic table columns from `additionalPrinterColumns`.
+- `internal/kube/discovery.Cache`: `ServerPreferredResources` plus the CRDs' `additionalPrinterColumns`,
+  built once per cluster connection and evicted with it. `DiscoveryAPI.Resources` / `Refresh`.
+  Subresources and anything that cannot be listed *and* watched are filtered out; a partial answer
+  (one dead aggregated API) is kept rather than discarded.
+- `domain.APIResource.Custom` is derived from the API group, not from the CRD list, so the tree needs
+  no permission on `customresourcedefinitions` — the printer columns are a separate best effort.
+- `features/discovery` mirrors it on the frontend; `features/resources/catalog.ts` folds it over
+  `kinds.ts`, taking the served version and scope from the cluster and falling back to generic
+  columns (`generic.columns.ts` + `shared/lib/jsonpath.ts`) for any kind with no columns file.
+- `features/navigation/nav.tree.ts` filters the curated sections to what the cluster serves and
+  appends one section per custom API group. `nav.model.ts` stays the curated catalog — see
+  `decisions/discovery.md` for why the tree is not generated wholesale.
+- Every built-in nav leaf now has a GVR, so Secrets, Jobs, Ingresses and the rest open a real table
+  instead of "not wired up yet". Only Pods, Deployments, Nodes, Services, ConfigMaps and CRDs have
+  hand-written columns; the others are generic until someone needs more.
+
+Exit: verified against fixtures (browser dev server) and a scripted discovery interface + the fake
+dynamic client. `ServerPreferredResources` has never run against a real API server.
 
 ## Phase 7 — Metrics + overview
 
@@ -98,7 +114,7 @@ composites, so `requestAnimationFrame` never fires) — the data path was verifi
 
 ## Phase 9 — Production hardening
 
-- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list, per-cluster display names and the port forwards to restore on connect. UI preferences (theme, appearance, panel sizes, grid layouts, namespace filter, open tabs, last cluster) live in `localStorage` through `shared/lib/persist.ts` — see `DECISIONS.md` for which side owns what.
+- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list, per-cluster display names and the port forwards to restore on connect. UI preferences (theme, appearance, panel sizes, grid layouts, namespace filter, open tabs, last cluster) live in `localStorage` through `shared/lib/persist.ts` — see `decisions/settings.md` for which side owns what.
 - Appearance is done: `SettingsAPI` (`Fonts`/`Dir`/`Reveal`) plus `features/settings` — installed-font picker for the UI and monospace families, and a text size that scales the whole type scale off one CSS variable.
 - Structured logging with `log/slog`, log file in the same dir.
 - Table tests for the registry, informer ref-counting, and the coalescer.

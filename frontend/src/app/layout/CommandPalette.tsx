@@ -1,7 +1,8 @@
 import { Command } from 'cmdk'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useClusters } from '@/features/clusters/cluster.store'
-import { NAV_SECTIONS } from '@/features/navigation/nav.model'
+import { clusterResources, useDiscovery } from '@/features/discovery/discovery.store'
+import { navSections } from '@/features/navigation/nav.tree'
 import { useTabs } from '@/features/tabs/tab.store'
 import { Dot, type Tone } from '@/shared/ui/Badge'
 
@@ -19,6 +20,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const openTab = useTabs((s) => s.open)
   const clusters = useClusters((s) => s.clusters)
   const activate = useClusters((s) => s.activate)
+  const activeId = useClusters((s) => s.activeId)
+  const resources = useDiscovery(clusterResources(activeId))
+  const sections = useMemo(() => navSections(resources), [resources])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -69,7 +73,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             ))}
           </Command.Group>
 
-          {NAV_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <Command.Group
               key={section.id}
               heading={section.label}
@@ -80,7 +84,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   key={leaf.id}
                   value={`${section.label} ${leaf.label}`}
                   onSelect={() => {
-                    openTab(section.id, leaf.id)
+                    openTab(section.id, leaf.id, leaf.label)
                     onOpenChange(false)
                   }}
                   className={ITEM}

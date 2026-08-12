@@ -1,8 +1,12 @@
 import { ChevronRight } from 'lucide-react'
-import { NAV_SECTIONS, type NavSection } from '@/features/navigation/nav.model'
-import { useNav } from '@/features/navigation/nav.store'
+import { useMemo } from 'react'
+import { useClusters } from '@/features/clusters/cluster.store'
+import { clusterResources, useDiscovery } from '@/features/discovery/discovery.store'
 import { activeTab, useTabs } from '@/features/tabs/tab.store'
 import { cn } from '@/shared/lib/cn'
+import type { NavSection } from './nav.model'
+import { navSections } from './nav.tree'
+import { useNav } from './nav.store'
 
 function Section({ section, forceOpen }: { section: NavSection; forceOpen: boolean }) {
   const expanded = useNav((s) => s.expanded[section.id])
@@ -22,7 +26,9 @@ function Section({ section, forceOpen }: { section: NavSection; forceOpen: boole
           className={cn('size-3.5 shrink-0 text-faint transition-transform', open && 'rotate-90')}
         />
         <Icon className="size-4 shrink-0" />
-        <span className="flex-1 truncate text-sm">{section.label}</span>
+        <span title={section.label} className="flex-1 truncate text-sm">
+          {section.label}
+        </span>
       </button>
 
       {open && (
@@ -32,7 +38,7 @@ function Section({ section, forceOpen }: { section: NavSection; forceOpen: boole
             return (
               <button
                 key={leaf.id}
-                onClick={() => openTab(section.id, leaf.id)}
+                onClick={() => openTab(section.id, leaf.id, leaf.label)}
                 className={cn(
                   'block w-full truncate rounded-md py-[5px] pl-7 pr-2 text-left text-sm transition-colors',
                   selected
@@ -51,14 +57,28 @@ function Section({ section, forceOpen }: { section: NavSection; forceOpen: boole
 }
 
 export function NavTree({ query }: { query: string }) {
+  const clusterId = useClusters((s) => s.activeId)
+  const resources = useDiscovery(clusterResources(clusterId))
+  const all = useMemo(() => navSections(resources), [resources])
+
   const needle = query.trim().toLowerCase()
 
+  // A section whose own label matches keeps all of its children: typing the API
+  // group of a CRD is how you look for its kinds.
   const sections = needle
-    ? NAV_SECTIONS.map((section) => ({
-        ...section,
-        children: section.children.filter((leaf) => leaf.label.toLowerCase().includes(needle)),
-      })).filter((section) => section.children.length > 0)
-    : NAV_SECTIONS
+    ? all
+        .map((section) =>
+          section.label.toLowerCase().includes(needle)
+            ? section
+            : {
+                ...section,
+                children: section.children.filter((leaf) =>
+                  leaf.label.toLowerCase().includes(needle),
+                ),
+              },
+        )
+        .filter((section) => section.children.length > 0)
+    : all
 
   if (sections.length === 0) {
     return <div className="py-3 pl-7 text-sm text-faint">No resource matches</div>

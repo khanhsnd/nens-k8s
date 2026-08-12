@@ -1,5 +1,83 @@
 export namespace domain {
 	
+	export class PrinterColumn {
+	    name: string;
+	    type: string;
+	    jsonPath: string;
+	    priority: number;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PrinterColumn(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.jsonPath = source["jsonPath"];
+	        this.priority = source["priority"];
+	        this.description = source["description"];
+	    }
+	}
+	export class GVR {
+	    group: string;
+	    version: string;
+	    resource: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GVR(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.group = source["group"];
+	        this.version = source["version"];
+	        this.resource = source["resource"];
+	    }
+	}
+	export class APIResource {
+	    gvr: GVR;
+	    kind: string;
+	    namespaced: boolean;
+	    custom: boolean;
+	    verbs: string[];
+	    shortNames?: string[];
+	    columns?: PrinterColumn[];
+	
+	    static createFrom(source: any = {}) {
+	        return new APIResource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.gvr = this.convertValues(source["gvr"], GVR);
+	        this.kind = source["kind"];
+	        this.namespaced = source["namespaced"];
+	        this.custom = source["custom"];
+	        this.verbs = source["verbs"];
+	        this.shortNames = source["shortNames"];
+	        this.columns = this.convertValues(source["columns"], PrinterColumn);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Cluster {
 	    id: string;
 	    name: string;
@@ -106,22 +184,7 @@ export namespace domain {
 	        this.protocol = source["protocol"];
 	    }
 	}
-	export class GVR {
-	    group: string;
-	    version: string;
-	    resource: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new GVR(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.group = source["group"];
-	        this.version = source["version"];
-	        this.resource = source["resource"];
-	    }
-	}
 	export class KubeconfigFile {
 	    path: string;
 	    contexts: number;
@@ -228,6 +291,7 @@ export namespace domain {
 	        this.error = source["error"];
 	    }
 	}
+	
 	export class ResourceRef {
 	    clusterId: string;
 	    gvr: GVR;

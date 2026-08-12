@@ -93,6 +93,8 @@ func (c *Connection) Dynamic() dynamic.Interface { return c.clients.Dynamic }
 
 func (c *Connection) Clientset() kubernetes.Interface { return c.clients.Clientset }
 
+func (c *Connection) Discovery() discovery.CachedDiscoveryInterface { return c.clients.Discovery }
+
 func (c *Connection) Mapper() apimeta.RESTMapper { return c.clients.Mapper }
 
 func (c *Connection) Context() context.Context { return c.ctx }

@@ -4,14 +4,16 @@ import {
   subscribeClusterEvents,
   useClusters,
 } from '@/features/clusters/cluster.store'
+import { clusterResources, useDiscovery } from '@/features/discovery/discovery.store'
 import { Dock } from '@/features/dock/Dock'
 import { useDock } from '@/features/dock/dock.store'
 import { subscribeLogEvents } from '@/features/logs/log.store'
 import { PortForwardView } from '@/features/portforward/PortForwardView'
 import { subscribeForwardEvents, useForwards } from '@/features/portforward/portforward.store'
+import { kindFor } from '@/features/resources/catalog'
 import { DiscardGuard } from '@/features/resources/DiscardGuard'
 import { useEditorGuard } from '@/features/resources/editor.store'
-import { kindFor, type Kind } from '@/features/resources/kinds'
+import type { Kind } from '@/features/resources/kinds'
 import { sliceKey, subscribeResourceEvents, useResources } from '@/features/resources/resource.store'
 import { ResourceView } from '@/features/resources/ResourceView'
 import { TabBar } from '@/features/tabs/TabBar'
@@ -32,6 +34,7 @@ export function AppShell() {
   const phase = useClusters((s) => activeCluster(s)?.phase ?? null)
   const tabs = useTabs((s) => s.tabs)
   const tab = useTabs(activeTab)
+  const resources = useDiscovery(clusterResources(clusterId))
   const sync = useResources((s) => s.sync)
   const guard = useEditorGuard((s) => s.guard)
   const dockMaximized = useDock((s) => s.maximized)
@@ -55,21 +58,23 @@ export function AppShell() {
     return subscribeForwardEvents()
   }, [])
 
-  // Saved forwards come back when their cluster connects — `sync` runs once per
-  // connection, so re-rendering on every cluster event costs nothing.
+  // The API surface and the saved forwards both follow connections, not renders
+  // — each store syncs once per connection, so re-running this per cluster event
+  // costs nothing.
   useEffect(() => {
     const connected = clusters.filter((item) => item.phase === 'connected').map((item) => item.id)
+    void useDiscovery.getState().sync(connected)
     void useForwards.getState().sync(connected)
   }, [clusters])
 
   useEffect(() => {
     const kinds = tabs
-      .map((item) => kindFor(item.leafId))
+      .map((item) => kindFor(item.leafId, resources))
       .filter((kind): kind is Kind => kind !== null)
     void sync(phase === 'connected' ? clusterId : null, kinds)
-  }, [clusterId, phase, tabs, sync])
+  }, [clusterId, phase, tabs, resources, sync])
 
-  const kind = tab ? kindFor(tab.leafId) : null
+  const kind = tab ? kindFor(tab.leafId, resources) : null
   const key = clusterId && kind ? sliceKey(clusterId, kind.id) : null
   const selectedObject = useResources((s) =>
     selected && selected.key === key ? s.slices[key]?.objects.get(selected.uid) : undefined,
