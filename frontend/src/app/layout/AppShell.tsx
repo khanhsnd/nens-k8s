@@ -16,7 +16,6 @@ import { TabBar } from '@/features/tabs/TabBar'
 import { activeTab, useTabs } from '@/features/tabs/tab.store'
 import { cn } from '@/shared/lib/cn'
 import { Placeholder } from '@/shared/ui/Placeholder'
-import { ClusterRail } from './ClusterRail'
 import { CommandPalette } from './CommandPalette'
 import { DetailDrawer } from './DetailDrawer'
 import { Sidebar } from './Sidebar'
@@ -82,7 +81,6 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col">
       <div className={cn('flex min-h-0 flex-1', dockMaximized && 'hidden')}>
-        <ClusterRail />
         <Sidebar />
 
         <main className="flex min-w-0 flex-1 flex-col">

@@ -20,7 +20,7 @@ export const FIXTURE_CLUSTERS: Cluster[] = [
     user: 'khanh',
     namespace: 'staging',
     phase: 'disconnected',
-    version: '',
+    version: 'v1.30.6',
     error: '',
   },
   {
@@ -31,7 +31,7 @@ export const FIXTURE_CLUSTERS: Cluster[] = [
     user: 'kind',
     namespace: 'default',
     phase: 'disconnected',
-    version: '',
+    version: 'v1.32.0',
     error: '',
   },
 ]

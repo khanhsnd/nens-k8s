@@ -10,6 +10,7 @@ type ClusterState = {
   offline: boolean
   load: () => Promise<void>
   activate: (id: string) => Promise<void>
+  connect: (id: string) => Promise<void>
   disconnect: (id: string) => Promise<void>
   rename: (id: string, name: string) => Promise<void>
 }
@@ -36,7 +37,14 @@ export const useClusters = create<ClusterState>((set, get) => ({
 
   activate: async (id) => {
     set({ activeId: id })
-    if (get().offline) return
+    await get().connect(id)
+  },
+
+  connect: async (id) => {
+    if (get().offline) {
+      const fixture = FIXTURE_CLUSTERS.find((c) => c.id === id)
+      return set(patch(id, { phase: 'connected', version: fixture?.version ?? '' }))
+    }
     try {
       const cluster = (await Connect(id)) as Cluster
       set(patch(id, cluster))

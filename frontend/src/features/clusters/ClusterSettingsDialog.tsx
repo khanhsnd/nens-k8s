@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { copyText } from '@/shared/lib/clipboard'
 import { Dialog } from '@/shared/ui/Dialog'
 import { useClusters } from './cluster.store'
 import type { Cluster } from './cluster.types'
@@ -8,7 +9,7 @@ const DETAILS: { label: string; value: (cluster: Cluster) => string }[] = [
   { label: 'Server', value: (cluster) => cluster.server },
   { label: 'User', value: (cluster) => cluster.user },
   { label: 'Namespace', value: (cluster) => cluster.namespace },
-  { label: 'Version', value: (cluster) => cluster.version || '—' },
+  { label: 'Version', value: (cluster) => cluster.version },
 ]
 
 export function ClusterSettingsDialog({
@@ -51,12 +52,27 @@ export function ClusterSettingsDialog({
         </p>
 
         <dl className="border-t border-line pt-2 text-[12px]">
-          {DETAILS.map((detail) => (
-            <div key={detail.label} className="grid grid-cols-[90px_1fr] gap-3 py-1">
-              <dt className="text-faint">{detail.label}</dt>
-              <dd className="truncate font-mono text-muted">{detail.value(cluster)}</dd>
-            </div>
-          ))}
+          {DETAILS.map((detail) => {
+            const value = detail.value(cluster)
+            return (
+              <div key={detail.label} className="grid grid-cols-[90px_1fr] gap-3 py-1">
+                <dt className="text-faint">{detail.label}</dt>
+                <dd className="min-w-0 font-mono text-muted">
+                  {value ? (
+                    <button
+                      title="Copy"
+                      onClick={() => void copyText(value)}
+                      className="block w-full truncate text-left transition-colors hover:text-text"
+                    >
+                      {value}
+                    </button>
+                  ) : (
+                    '—'
+                  )}
+                </dd>
+              </div>
+            )
+          })}
         </dl>
 
         {error && <p className="text-[11.5px] text-danger">{error}</p>}
