@@ -109,6 +109,25 @@ func (r *Registry) Disconnect(id string) error {
 	return nil
 }
 
+func (r *Registry) Rename(id string, name string) (domain.Cluster, error) {
+	if err := r.source.Rename(id, name); err != nil {
+		return domain.Cluster{}, err
+	}
+
+	meta, err := r.lookup(id)
+	if err != nil {
+		return domain.Cluster{}, err
+	}
+
+	if conn, ok := r.Connection(id); ok {
+		conn.Rename(meta.Name)
+		meta = conn.Meta()
+	}
+
+	r.bus.Publish(event.TopicClusterChanged, meta)
+	return meta, nil
+}
+
 func (r *Registry) Shutdown() {
 	r.mu.Lock()
 	conns := r.conns

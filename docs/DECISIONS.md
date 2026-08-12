@@ -111,6 +111,40 @@ the import belongs there; a webview `<input type="file">` cannot give an absolut
 and reading the contents instead would turn "point at my kubeconfig" into a silent copy
 that goes stale.
 
+## Cluster settings
+
+### Renaming a cluster is a settings alias, not a kubeconfig edit
+
+`ClusterAPI.Rename(id, name)` stores `clusterNames[context] = name` in `settings.json`, and
+`kubeconfig.Loader.Clusters()` lays that over the context name when it builds each
+`Cluster`. Rewriting the context name inside the kubeconfig file was the obvious
+alternative and is wrong: `Cluster.ID == Context` is the identity every tab, subscription
+and informer is keyed by, other tools read the same files, and a file Nens merely points at
+is not ours to rewrite. An empty name drops the alias, so the context name comes back.
+
+`Connection` gained a mutex for this. `Registry.List()` answers from `conn.Meta()` for a
+connected cluster, so the rename has to land on the connection's own copy — which the Wails
+goroutine reads while the rename writes it — and it must not disturb the live phase and
+version there.
+
+## Grid selection and row actions
+
+### Clicking a cell tints the whole row, but the selection rect stays a rect
+
+Rows inside the selection rect get `bg-raised`; cells inside it keep `bg-accent-dim`, and
+the drawer's row keeps `bg-accent-dim` across its full width. Widening the rect itself to
+the whole row on click would make "select the row" literal at the cost of column-range
+drag, and would turn every `Ctrl+C` into a full-row copy.
+
+### The row actions cell is the last grid column, not an overlay
+
+`DataGrid` appends a fixed track to the template and renders a `sticky right-0` cell
+holding the three-dot button. Being a real column keeps the header and the body on the same
+grid and stops the button from covering data; it repeats the row background because sticky
+content scrolls over the cells behind it. It is deliberately not a `Column` in the kind's
+spec — selection, copy and keyboard navigation are keyed by `columns.length` and must not
+see it.
+
 ## Testing
 
 `internal/kube/resource` is covered by `k8s.io/client-go/dynamic/fake`, which drives a

@@ -2,6 +2,7 @@ import { Plus, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { AddClusterDialog } from '@/features/clusters/AddClusterDialog'
 import { useClusters } from '@/features/clusters/cluster.store'
+import { ClusterMenu } from '@/features/clusters/ClusterMenu'
 import type { Cluster, ClusterPhase } from '@/features/clusters/cluster.types'
 import { cn } from '@/shared/lib/cn'
 import { Tooltip } from '@/shared/ui/Tooltip'
@@ -26,30 +27,32 @@ function ClusterAvatar({ cluster, active }: { cluster: Cluster; active: boolean 
   const activate = useClusters((s) => s.activate)
 
   return (
-    <Tooltip
-      label={
-        <div className="space-y-0.5">
-          <div className="font-medium">{cluster.name}</div>
-          <div className="text-faint">{cluster.server}</div>
-        </div>
-      }
-    >
-      <button
-        onClick={() => void activate(cluster.id)}
-        className={cn(
-          'relative grid size-9 place-items-center rounded-[10px] text-[11px] font-semibold ring-2 transition-all',
-          PHASE_RING[cluster.phase],
-          active
-            ? 'bg-accent text-base'
-            : 'bg-raised text-muted hover:bg-overlay hover:text-text',
-        )}
+    <ClusterMenu cluster={cluster}>
+      <Tooltip
+        label={
+          <div className="space-y-0.5">
+            <div className="font-medium">{cluster.name}</div>
+            <div className="text-faint">{cluster.server}</div>
+          </div>
+        }
       >
-        {initials(cluster.name)}
-        {active && (
-          <span className="absolute -left-[11px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-accent" />
-        )}
-      </button>
-    </Tooltip>
+        <button
+          onClick={() => void activate(cluster.id)}
+          className={cn(
+            'relative grid size-9 place-items-center rounded-[10px] text-[11px] font-semibold ring-2 transition-all',
+            PHASE_RING[cluster.phase],
+            active
+              ? 'bg-accent text-base'
+              : 'bg-raised text-muted hover:bg-overlay hover:text-text',
+          )}
+        >
+          {initials(cluster.name)}
+          {active && (
+            <span className="absolute -left-[11px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-accent" />
+          )}
+        </button>
+      </Tooltip>
+    </ClusterMenu>
   )
 }
 

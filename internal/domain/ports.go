@@ -9,6 +9,7 @@ import (
 type KubeconfigSource interface {
 	Clusters() ([]Cluster, error)
 	RESTConfig(contextName string) (*rest.Config, error)
+	Rename(id string, name string) error
 }
 
 type KubeconfigFiles interface {
@@ -22,6 +23,8 @@ type SettingsStore interface {
 	Dir() (string, error)
 	Kubeconfigs() []string
 	SetKubeconfigs(paths []string) error
+	ClusterNames() map[string]string
+	SetClusterName(id string, name string) error
 }
 
 type ClusterRegistry interface {
@@ -29,6 +32,7 @@ type ClusterRegistry interface {
 	Get(id string) (Cluster, bool)
 	Connect(ctx context.Context, id string) (Cluster, error)
 	Disconnect(id string) error
+	Rename(id string, name string) (Cluster, error)
 	Shutdown()
 }
 

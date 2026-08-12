@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,7 +16,8 @@ const (
 )
 
 type data struct {
-	Kubeconfigs []string `json:"kubeconfigs"`
+	Kubeconfigs  []string          `json:"kubeconfigs"`
+	ClusterNames map[string]string `json:"clusterNames"`
 }
 
 type Store struct {
@@ -58,6 +60,34 @@ func (s *Store) SetKubeconfigs(paths []string) error {
 	s.data.Kubeconfigs = paths
 	if err := s.write(); err != nil {
 		s.data.Kubeconfigs = previous
+		return err
+	}
+	return nil
+}
+
+func (s *Store) ClusterNames() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return maps.Clone(s.data.ClusterNames)
+}
+
+func (s *Store) SetClusterName(id string, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	previous := maps.Clone(s.data.ClusterNames)
+	if name == "" {
+		delete(s.data.ClusterNames, id)
+	} else {
+		if s.data.ClusterNames == nil {
+			s.data.ClusterNames = make(map[string]string)
+		}
+		s.data.ClusterNames[id] = name
+	}
+
+	if err := s.write(); err != nil {
+		s.data.ClusterNames = previous
 		return err
 	}
 	return nil

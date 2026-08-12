@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -30,6 +31,7 @@ users:
 type settings struct {
 	dir   string
 	paths []string
+	names map[string]string
 }
 
 func (s *settings) Dir() (string, error)  { return s.dir, nil }
@@ -37,6 +39,16 @@ func (s *settings) Kubeconfigs() []string { return slices.Clone(s.paths) }
 
 func (s *settings) SetKubeconfigs(paths []string) error {
 	s.paths = paths
+	return nil
+}
+
+func (s *settings) ClusterNames() map[string]string { return maps.Clone(s.names) }
+
+func (s *settings) SetClusterName(id string, name string) error {
+	if s.names == nil {
+		s.names = make(map[string]string)
+	}
+	s.names[id] = name
 	return nil
 }
 

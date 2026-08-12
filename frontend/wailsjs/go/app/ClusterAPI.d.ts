@@ -7,3 +7,5 @@ export function Connect(arg1:string):Promise<domain.Cluster>;
 export function Disconnect(arg1:string):Promise<void>;
 
 export function List():Promise<Array<domain.Cluster>>;
+
+export function Rename(arg1:string,arg2:string):Promise<domain.Cluster>;

@@ -1,7 +1,9 @@
 package kubeconfig
 
 import (
+	"cmp"
 	"sort"
+	"strings"
 
 	"nens-k8s/internal/domain"
 
@@ -34,11 +36,12 @@ func (l *Loader) Clusters() ([]domain.Cluster, error) {
 		return nil, err
 	}
 
+	aliases := l.settings.ClusterNames()
 	clusters := make([]domain.Cluster, 0, len(cfg.Contexts))
 	for name, kctx := range cfg.Contexts {
 		cluster := domain.Cluster{
 			ID:        name,
-			Name:      name,
+			Name:      cmp.Or(aliases[name], name),
 			Context:   name,
 			User:      kctx.AuthInfo,
 			Namespace: kctx.Namespace,
@@ -55,6 +58,10 @@ func (l *Loader) Clusters() ([]domain.Cluster, error) {
 
 	sort.Slice(clusters, func(i, j int) bool { return clusters[i].Name < clusters[j].Name })
 	return clusters, nil
+}
+
+func (l *Loader) Rename(id string, name string) error {
+	return l.settings.SetClusterName(id, strings.TrimSpace(name))
 }
 
 func (l *Loader) RESTConfig(contextName string) (*rest.Config, error) {

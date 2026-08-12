@@ -1,4 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { MoreHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { useGridSelection, type Rect } from './grid.selection'
@@ -13,6 +14,7 @@ export type Column<T> = {
 }
 
 const ROW_HEIGHT = 30
+const ACTIONS_WIDTH = 36
 const AUTOSCROLL_EDGE = 28
 const AUTOSCROLL_SPEED = 12
 
@@ -45,8 +47,11 @@ export function DataGrid<T>({
   const pointer = useRef({ x: 0, y: 0 })
   const endDrag = useRef(() => {})
 
-  const template = columns.map((column) => `minmax(${column.min}px, ${column.grow}fr)`).join(' ')
-  const minWidth = columns.reduce((total, column) => total + column.min, 0)
+  const template = columns
+    .map((column) => `minmax(${column.min}px, ${column.grow}fr)`)
+    .concat(`${ACTIONS_WIDTH}px`)
+    .join(' ')
+  const minWidth = columns.reduce((total, column) => total + column.min, ACTIONS_WIDTH)
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -138,6 +143,7 @@ export function DataGrid<T>({
               {column.label}
             </button>
           ))}
+          <div />
         </div>
       </div>
 
@@ -157,6 +163,13 @@ export function DataGrid<T>({
             const row = rows[item.index]
             if (!row) return null
 
+            const background =
+              rowKey(row) === activeKey
+                ? 'bg-accent-dim'
+                : item.index >= rect.top && item.index <= rect.bottom
+                  ? 'bg-raised'
+                  : 'bg-base'
+
             return (
               <div
                 key={rowKey(row)}
@@ -169,7 +182,7 @@ export function DataGrid<T>({
                 }}
                 className={cn(
                   'absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-[12.5px]',
-                  rowKey(row) === activeKey && 'bg-raised',
+                  background,
                 )}
               >
                 {columns.map((column, c) => {
@@ -208,6 +221,23 @@ export function DataGrid<T>({
                     </div>
                   )
                 })}
+
+                <div
+                  className={cn(
+                    'sticky right-0 grid place-items-center border-l border-line/40',
+                    background,
+                  )}
+                >
+                  {onActivate && (
+                    <button
+                      onClick={() => onActivate(row)}
+                      title="Open details"
+                      className="grid size-6 place-items-center rounded text-faint transition-colors hover:bg-overlay hover:text-text"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}

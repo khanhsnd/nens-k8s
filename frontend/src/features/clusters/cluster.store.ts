@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Connect, Disconnect, List } from '@bindings/go/app/ClusterAPI'
+import { Connect, Disconnect, List, Rename } from '@bindings/go/app/ClusterAPI'
 import { EventsOn } from '@bindings/runtime/runtime'
 import type { Cluster } from './cluster.types'
 import { FIXTURE_CLUSTERS } from './cluster.fixtures'
@@ -11,6 +11,13 @@ type ClusterState = {
   load: () => Promise<void>
   activate: (id: string) => Promise<void>
   disconnect: (id: string) => Promise<void>
+  rename: (id: string, name: string) => Promise<void>
+}
+
+function patch(id: string, changes: Partial<Cluster>) {
+  return (state: ClusterState) => ({
+    clusters: state.clusters.map((c) => (c.id === id ? { ...c, ...changes } : c)),
+  })
 }
 
 export const useClusters = create<ClusterState>((set, get) => ({
@@ -32,23 +39,22 @@ export const useClusters = create<ClusterState>((set, get) => ({
     if (get().offline) return
     try {
       const cluster = (await Connect(id)) as Cluster
-      set((state) => ({ clusters: state.clusters.map((c) => (c.id === id ? cluster : c)) }))
+      set(patch(id, cluster))
     } catch (error) {
-      set((state) => ({
-        clusters: state.clusters.map((c) =>
-          c.id === id ? { ...c, phase: 'error', error: String(error) } : c,
-        ),
-      }))
+      set(patch(id, { phase: 'error', error: String(error) }))
     }
   },
 
   disconnect: async (id) => {
     if (!get().offline) await Disconnect(id)
-    set((state) => ({
-      clusters: state.clusters.map((c) =>
-        c.id === id ? { ...c, phase: 'disconnected', version: '' } : c,
-      ),
-    }))
+    set(patch(id, { phase: 'disconnected', version: '' }))
+  },
+
+  rename: async (id, name) => {
+    const next = name.trim()
+    if (next === '') return
+    if (!get().offline) await Rename(id, next)
+    set(patch(id, { name: next }))
   },
 }))
 

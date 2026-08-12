@@ -13,3 +13,7 @@ export function Disconnect(arg1) {
 export function List() {
   return window['go']['app']['ClusterAPI']['List']();
 }
+
+export function Rename(arg1, arg2) {
+  return window['go']['app']['ClusterAPI']['Rename'](arg1, arg2);
+}

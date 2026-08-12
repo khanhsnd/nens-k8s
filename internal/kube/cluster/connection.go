@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"sync"
 
 	"nens-k8s/internal/domain"
 
@@ -15,6 +16,7 @@ import (
 )
 
 type Connection struct {
+	mu        sync.RWMutex
 	meta      domain.Cluster
 	config    *rest.Config
 	clientset *kubernetes.Clientset
@@ -60,7 +62,19 @@ func Dial(parent context.Context, meta domain.Cluster, config *rest.Config) (*Co
 	}, nil
 }
 
-func (c *Connection) Meta() domain.Cluster { return c.meta }
+func (c *Connection) Meta() domain.Cluster {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.meta
+}
+
+func (c *Connection) Rename(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.meta.Name = name
+}
 
 func (c *Connection) Dynamic() dynamic.Interface { return c.dynamic }
 

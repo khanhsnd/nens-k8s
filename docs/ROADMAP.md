@@ -63,7 +63,7 @@ Exit: Pods, Deployments, Nodes, Services, ConfigMaps live. Verified against fixt
 
 ## Phase 9 — Production hardening
 
-- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list. Extend it, don't replace it.
+- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list and per-cluster display names. Extend it, don't replace it.
 - Structured logging with `log/slog`, log file in the same dir.
 - Table tests for the registry, informer ref-counting, and the coalescer.
 - NSIS installer, code signing, auto-update feed.

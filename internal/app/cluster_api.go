@@ -30,3 +30,7 @@ func (a *ClusterAPI) Connect(id string) (domain.Cluster, error) {
 func (a *ClusterAPI) Disconnect(id string) error {
 	return a.registry.Disconnect(id)
 }
+
+func (a *ClusterAPI) Rename(id string, name string) (domain.Cluster, error) {
+	return a.registry.Rename(id, name)
+}
