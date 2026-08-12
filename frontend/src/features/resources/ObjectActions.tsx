@@ -1,20 +1,37 @@
-import * as Menu from '@radix-ui/react-dropdown-menu'
-import { Copy, MoreHorizontal, Scaling, Trash2, type LucideIcon } from 'lucide-react'
+import { Copy, Scaling, ScrollText, Trash2, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
+import { openLogsTool } from '@/features/dock/dock.store'
+import { cn } from '@/shared/lib/cn'
 import { copyText } from '@/shared/lib/clipboard'
 import { Dialog } from '@/shared/ui/Dialog'
+import { Tooltip } from '@/shared/ui/Tooltip'
+import type { Kind } from './kinds'
 import { deleteObject, scaleObject } from './object.api'
 import type { K8sObject, ResourceRef } from './resource.types'
 
-function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string; onSelect: () => void }) {
+function Action({
+  icon: Icon,
+  label,
+  danger,
+  onClick,
+}: {
+  icon: LucideIcon
+  label: string
+  danger?: boolean
+  onClick: () => void
+}) {
   return (
-    <Menu.Item
-      onSelect={onSelect}
-      className="flex cursor-default items-center gap-2 rounded px-2 py-1.5 text-muted outline-none data-[highlighted]:bg-raised data-[highlighted]:text-text"
-    >
-      <Icon className="size-3.5" />
-      {label}
-    </Menu.Item>
+    <Tooltip label={label} side="bottom">
+      <button
+        onClick={onClick}
+        className={cn(
+          'grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-raised',
+          danger ? 'hover:text-danger' : 'hover:text-text',
+        )}
+      >
+        <Icon className="size-4" />
+      </button>
+    </Tooltip>
   )
 }
 
@@ -131,10 +148,12 @@ function ScaleDialog({
 export function ObjectActions({
   target,
   object,
+  kind,
   onDeleted,
 }: {
   target: ResourceRef
   object: K8sObject
+  kind: Kind
   onDeleted: () => void
 }) {
   const [dialog, setDialog] = useState<'delete' | 'scale' | null>(null)
@@ -142,25 +161,14 @@ export function ObjectActions({
 
   return (
     <>
-      <Menu.Root>
-        <Menu.Trigger className="grid size-7 place-items-center rounded-md text-muted outline-none transition-colors hover:bg-raised hover:text-text">
-          <MoreHorizontal className="size-4" />
-        </Menu.Trigger>
-
-        <Menu.Portal>
-          <Menu.Content
-            align="end"
-            sideOffset={4}
-            className="z-50 min-w-44 rounded-md border border-line-strong bg-overlay p-1 text-[12px] shadow-xl"
-          >
-            {typeof replicas === 'number' && (
-              <Item icon={Scaling} label="Scale…" onSelect={() => setDialog('scale')} />
-            )}
-            <Item icon={Copy} label="Copy name" onSelect={() => void copyText(target.name)} />
-            <Item icon={Trash2} label="Delete…" onSelect={() => setDialog('delete')} />
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu.Root>
+      {kind.logs && (
+        <Action icon={ScrollText} label="Logs" onClick={() => openLogsTool(target)} />
+      )}
+      {typeof replicas === 'number' && (
+        <Action icon={Scaling} label="Scale…" onClick={() => setDialog('scale')} />
+      )}
+      <Action icon={Copy} label="Copy name" onClick={() => void copyText(target.name)} />
+      <Action icon={Trash2} label="Delete…" danger onClick={() => setDialog('delete')} />
 
       {dialog === 'delete' && (
         <DeleteDialog

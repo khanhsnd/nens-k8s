@@ -15,14 +15,18 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
+type Clients struct {
+	Config    *rest.Config
+	Dynamic   dynamic.Interface
+	Clientset kubernetes.Interface
+	Discovery discovery.CachedDiscoveryInterface
+	Mapper    apimeta.RESTMapper
+}
+
 type Connection struct {
-	mu        sync.RWMutex
-	meta      domain.Cluster
-	config    *rest.Config
-	clientset *kubernetes.Clientset
-	dynamic   dynamic.Interface
-	discovery discovery.CachedDiscoveryInterface
-	mapper    apimeta.RESTMapper
+	mu      sync.RWMutex
+	meta    domain.Cluster
+	clients Clients
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -49,20 +53,21 @@ func Dial(parent context.Context, meta domain.Cluster, config *rest.Config) (*Co
 	meta.Phase = domain.PhaseConnected
 	meta.Error = ""
 
-	conn := NewConnection(parent, meta, dyn, restmapper.NewDeferredDiscoveryRESTMapper(cached))
-	conn.config = config
-	conn.clientset = clientset
-	conn.discovery = cached
-	return conn, nil
+	return NewConnection(parent, meta, Clients{
+		Config:    config,
+		Dynamic:   dyn,
+		Clientset: clientset,
+		Discovery: cached,
+		Mapper:    restmapper.NewDeferredDiscoveryRESTMapper(cached),
+	}), nil
 }
 
-func NewConnection(parent context.Context, meta domain.Cluster, dyn dynamic.Interface, mapper apimeta.RESTMapper) *Connection {
+func NewConnection(parent context.Context, meta domain.Cluster, clients Clients) *Connection {
 	ctx, cancel := context.WithCancel(parent)
 
 	return &Connection{
 		meta:    meta,
-		dynamic: dyn,
-		mapper:  mapper,
+		clients: clients,
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -82,9 +87,11 @@ func (c *Connection) Rename(name string) {
 	c.meta.Name = name
 }
 
-func (c *Connection) Dynamic() dynamic.Interface { return c.dynamic }
+func (c *Connection) Dynamic() dynamic.Interface { return c.clients.Dynamic }
 
-func (c *Connection) Mapper() apimeta.RESTMapper { return c.mapper }
+func (c *Connection) Clientset() kubernetes.Interface { return c.clients.Clientset }
+
+func (c *Connection) Mapper() apimeta.RESTMapper { return c.clients.Mapper }
 
 func (c *Connection) Context() context.Context { return c.ctx }
 

@@ -10,6 +10,7 @@ import (
 const (
 	TopicClusterChanged = "cluster:changed"
 	TopicResourceEvent  = "resource:event"
+	TopicLogChunk       = "log:chunk"
 )
 
 type Bus struct {

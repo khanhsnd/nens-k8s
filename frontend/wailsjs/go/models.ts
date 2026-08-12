@@ -84,6 +84,48 @@ export namespace domain {
 	        this.error = source["error"];
 	    }
 	}
+	export class LogOptions {
+	    follow: boolean;
+	    tailLines: number;
+	    sinceSeconds: number;
+	    timestamps: boolean;
+	    previous: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.follow = source["follow"];
+	        this.tailLines = source["tailLines"];
+	        this.sinceSeconds = source["sinceSeconds"];
+	        this.timestamps = source["timestamps"];
+	        this.previous = source["previous"];
+	    }
+	}
+	export class LogTarget {
+	    namespace: string;
+	    pod: string;
+	    container: string;
+	    role: string;
+	    state: string;
+	    restarts: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.namespace = source["namespace"];
+	        this.pod = source["pod"];
+	        this.container = source["container"];
+	        this.role = source["role"];
+	        this.state = source["state"];
+	        this.restarts = source["restarts"];
+	    }
+	}
 	export class OwnerRef {
 	    gvr: GVR;
 	    kind: string;

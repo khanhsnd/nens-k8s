@@ -1,10 +1,12 @@
 import { ChevronRight } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { NAV_SECTIONS, type NavSection } from '@/features/navigation/nav.model'
 import { useNav } from '@/features/navigation/nav.store'
 import { activeTab, useTabs } from '@/features/tabs/tab.store'
 import { useClusters, activeCluster } from '@/features/clusters/cluster.store'
 import { cn } from '@/shared/lib/cn'
+import { usePanelSize } from '@/shared/ui/panel.size'
+import { Resizer } from '@/shared/ui/Resizer'
 
 function Section({ section }: { section: NavSection }) {
   const { expanded, toggleSection } = useNav()
@@ -54,40 +56,8 @@ function Section({ section }: { section: NavSection }) {
   )
 }
 
-function ResizeHandle({ onResize }: { onResize: (width: number) => void }) {
-  const dragging = useRef(false)
-
-  const onPointerDown = useCallback((event: React.PointerEvent) => {
-    dragging.current = true
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }, [])
-
-  useEffect(() => {
-    const move = (event: PointerEvent) => {
-      if (dragging.current) onResize(event.clientX - 56)
-    }
-    const up = () => {
-      dragging.current = false
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    return () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-  }, [onResize])
-
-  return (
-    <div
-      onPointerDown={onPointerDown}
-      className="absolute right-0 top-0 h-full w-1 cursor-col-resize transition-colors hover:bg-accent/40"
-    />
-  )
-}
-
 export function Sidebar() {
-  const width = useNav((s) => s.sidebarWidth)
-  const setWidth = useNav((s) => s.setSidebarWidth)
+  const [width, setWidth] = usePanelSize('sidebar', { initial: 232, min: 180, max: 480 })
   const cluster = useClusters(activeCluster)
   const [query, setQuery] = useState('')
 
@@ -103,7 +73,7 @@ export function Sidebar() {
   return (
     <aside
       style={{ width }}
-      className="relative flex shrink-0 flex-col border-r border-line bg-surface"
+      className="relative flex max-w-[40vw] shrink-0 flex-col border-r border-line bg-surface"
     >
       <div className="border-b border-line px-3 py-3">
         <div className="truncate text-[13px] font-semibold">{cluster?.name ?? 'No cluster'}</div>
@@ -127,7 +97,7 @@ export function Sidebar() {
         ))}
       </div>
 
-      <ResizeHandle onResize={setWidth} />
+      <Resizer edge="right" onResize={setWidth} />
     </aside>
   )
 }

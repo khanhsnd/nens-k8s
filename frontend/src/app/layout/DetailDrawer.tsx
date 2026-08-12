@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useEditorGuard } from '@/features/resources/editor.store'
 import type { Kind } from '@/features/resources/kinds'
 import { refOf } from '@/features/resources/object.api'
@@ -9,40 +9,10 @@ import { ObjectOverview } from '@/features/resources/ObjectOverview'
 import { ObjectYaml } from '@/features/resources/ObjectYaml'
 import type { K8sObject } from '@/features/resources/resource.types'
 import { cn } from '@/shared/lib/cn'
+import { usePanelSize } from '@/shared/ui/panel.size'
+import { Resizer } from '@/shared/ui/Resizer'
 
-const TABS = ['Overview', 'YAML', 'Events', 'Logs', 'Shell'] as const
-const PHASE: Partial<Record<(typeof TABS)[number], string>> = { Logs: '4', Shell: '5' }
-
-const MIN_WIDTH = 360
-const MAX_WIDTH = 1100
-
-function ResizeHandle({ onResize }: { onResize: (width: number) => void }) {
-  const dragging = useRef(false)
-
-  useEffect(() => {
-    const move = (event: PointerEvent) => {
-      if (dragging.current) onResize(window.innerWidth - event.clientX)
-    }
-    const up = () => {
-      dragging.current = false
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    return () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-  }, [onResize])
-
-  return (
-    <div
-      onPointerDown={() => {
-        dragging.current = true
-      }}
-      className="absolute left-0 top-0 h-full w-1 cursor-col-resize transition-colors hover:bg-accent/40"
-    />
-  )
-}
+const TABS = ['Overview', 'YAML', 'Events'] as const
 
 export function DetailDrawer({
   object,
@@ -57,24 +27,27 @@ export function DetailDrawer({
 }) {
   const guard = useEditorGuard((s) => s.guard)
   const [tab, setTab] = useState<(typeof TABS)[number]>('Overview')
-  const [width, setWidth] = useState(460)
+  const [width, setWidth] = usePanelSize('drawer', { initial: 460, min: 360, max: 1100 })
 
   const uid = object.metadata.uid
   const target = useMemo(() => refOf(clusterId, kind, object), [clusterId, kind, uid])
-  const resize = useCallback((next: number) => setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next))), [])
 
   return (
     <aside
       style={{ width }}
-      className="relative flex shrink-0 flex-col border-l border-line bg-surface"
+      className="relative flex max-w-[70vw] shrink-0 flex-col border-l border-line bg-surface"
     >
-      <ResizeHandle onResize={resize} />
+      <Resizer edge="left" onResize={setWidth} />
 
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-4">
         <span className="mr-auto truncate text-[13px] font-semibold">{object.metadata.name}</span>
-        <ObjectActions target={target} object={object} onDeleted={onClose} />
+
+        <ObjectActions target={target} object={object} kind={kind} onDeleted={onClose} />
+
+        <span className="mx-1 h-4 w-px bg-line" />
         <button
           onClick={() => guard(onClose)}
+          title="Close"
           className="grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-raised hover:text-text"
         >
           <X className="size-4" />
@@ -103,11 +76,6 @@ export function DetailDrawer({
         {tab === 'Overview' && <ObjectOverview object={object} kind={kind} target={target} />}
         {tab === 'YAML' && <ObjectYaml target={target} />}
         {tab === 'Events' && <ObjectEvents target={target} />}
-        {PHASE[tab] && (
-          <div className="grid flex-1 place-items-center text-[12px] text-faint">
-            {tab} panel — phase {PHASE[tab]}
-          </div>
-        )}
       </div>
     </aside>
   )

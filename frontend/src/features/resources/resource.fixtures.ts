@@ -47,6 +47,7 @@ function makePods(count = 800): K8sObject[] {
       },
       spec: {
         nodeName: `node-${(index % 6) + 1}.sgn.internal`,
+        initContainers: index % 4 === 0 ? [{ name: 'wait-for-config' }] : undefined,
         containers: [{ name: app, image: `registry.internal/${app}:1.${index % 9}.0` }],
       },
       status: {

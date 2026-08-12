@@ -10,12 +10,14 @@ export type Kind = {
   gvr: GVR
   namespaced: boolean
   columns: ResourceColumn[]
+  /** Owns pods, so the bottom panel can stream its logs. */
+  logs?: boolean
 }
 
 const core = (resource: string): GVR => ({ group: '', version: 'v1', resource })
 
 export const KINDS: Record<string, Kind> = {
-  pods: { id: 'pods', gvr: core('pods'), namespaced: true, columns: POD_COLUMNS },
+  pods: { id: 'pods', gvr: core('pods'), namespaced: true, columns: POD_COLUMNS, logs: true },
   nodes: { id: 'nodes', gvr: core('nodes'), namespaced: false, columns: NODE_COLUMNS },
   services: { id: 'services', gvr: core('services'), namespaced: true, columns: SERVICE_COLUMNS },
   configmaps: {
@@ -29,6 +31,7 @@ export const KINDS: Record<string, Kind> = {
     gvr: { group: 'apps', version: 'v1', resource: 'deployments' },
     namespaced: true,
     columns: DEPLOYMENT_COLUMNS,
+    logs: true,
   },
 }
 

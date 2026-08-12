@@ -4,6 +4,9 @@ import {
   subscribeClusterEvents,
   useClusters,
 } from '@/features/clusters/cluster.store'
+import { Dock } from '@/features/dock/Dock'
+import { useDock } from '@/features/dock/dock.store'
+import { subscribeLogEvents } from '@/features/logs/log.store'
 import { DiscardGuard } from '@/features/resources/DiscardGuard'
 import { useEditorGuard } from '@/features/resources/editor.store'
 import { kindFor, type Kind } from '@/features/resources/kinds'
@@ -11,6 +14,7 @@ import { sliceKey, subscribeResourceEvents, useResources } from '@/features/reso
 import { ResourceView } from '@/features/resources/ResourceView'
 import { TabBar } from '@/features/tabs/TabBar'
 import { activeTab, useTabs } from '@/features/tabs/tab.store'
+import { cn } from '@/shared/lib/cn'
 import { Placeholder } from '@/shared/ui/Placeholder'
 import { ClusterRail } from './ClusterRail'
 import { CommandPalette } from './CommandPalette'
@@ -27,6 +31,7 @@ export function AppShell() {
   const tab = useTabs(activeTab)
   const sync = useResources((s) => s.sync)
   const guard = useEditorGuard((s) => s.guard)
+  const dockMaximized = useDock((s) => s.maximized)
 
   const [selected, setSelected] = useState<{ key: string; uid: string } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -37,6 +42,8 @@ export function AppShell() {
   }, [load])
 
   useEffect(() => subscribeResourceEvents(), [])
+
+  useEffect(() => subscribeLogEvents(), [])
 
   useEffect(() => {
     const kinds = tabs
@@ -74,7 +81,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex min-h-0 flex-1">
+      <div className={cn('flex min-h-0 flex-1', dockMaximized && 'hidden')}>
         <ClusterRail />
         <Sidebar />
 
@@ -96,6 +103,7 @@ export function AppShell() {
         )}
       </div>
 
+      <Dock />
       <StatusBar />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <DiscardGuard />

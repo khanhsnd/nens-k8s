@@ -50,6 +50,12 @@ type ResourceEditor interface {
 	Events(ctx context.Context, ref ResourceRef) ([]EventRecord, error)
 }
 
+type LogStreamer interface {
+	Targets(ctx context.Context, ref ResourceRef) ([]LogTarget, error)
+	Start(token string, clusterID string, target LogTarget, opts LogOptions) error
+	Stop(token string) error
+}
+
 type Publisher interface {
 	Publish(topic string, payload any)
 }

@@ -40,11 +40,24 @@ Exit: Pods, Deployments, Nodes, Services, ConfigMaps live. Verified against fixt
 Exit: verified against fixtures (browser dev server) and the fake dynamic client. The write paths
 (`Apply`, `Delete`, `Scale`) have never run against a real API server.
 
-## Phase 4 — Logs
+## Phase 4 — Logs (done)
 
-- `LogAPI.Stream(ref, container, opts)` → goroutine reading `GetLogs(...).Stream(ctx)`, chunked to `log:<token>` events.
-- Frontend: xterm.js with `@xterm/addon-fit` + search addon, follow-tail toggle, container picker, download.
-- Backpressure: bounded channel, drop-oldest with a visible "lines dropped" marker.
+- `internal/kube/logs.Streamer`: one goroutine per token reading `GetLogs(...).Stream(ctx)`, lines
+  coalesced into one `log:chunk` event per 100ms, drop-oldest past 5k buffered lines.
+- `LogAPI.Targets(ref)` resolves a pod, a workload's LabelSelector or a service's selector into
+  `{pod, container, role, state, restarts}`; `Start(token, clusterID, target, opts)` / `Stop(token)`.
+- `features/logs`: virtualized line list on `@tanstack/react-virtual`, `LogBuffer` scrollback capped at
+  10k/50k/200k lines outside React, incremental search index, filter-to-matches, regex + case toggles,
+  match stepping, follow-tail, wrap, timestamps, previous container, tail/since, multi-container merge,
+  copy, download.
+- `features/dock`: the bottom panel that hosts them — its own tab strip, one tab per streaming target,
+  maximise, resizable. Phase 5's shell plugs in as a second `DockTool.kind`.
+- `shared/ui/Resizer.tsx` + `panel.size.ts`: every panel (sidebar, drawer, dock) drags the same way and
+  remembers its size.
+
+Exit: verified against fixtures (browser dev server) and the fake clientset + fake dynamic client.
+`GetLogs` has never run against a real API server. Streaming the logs of a *workload* (deployment →
+all its pods) is wired end to end but only exercised by fixtures.
 
 ## Phase 5 — Exec + port-forward
 

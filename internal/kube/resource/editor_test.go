@@ -86,7 +86,10 @@ func newEditor(t *testing.T, objects ...runtime.Object) (*Editor, *dynamicfake.F
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	conn := cluster.NewConnection(ctx, domain.Cluster{ID: "test"}, client, mapper)
+	conn := cluster.NewConnection(ctx, domain.Cluster{ID: "test"}, cluster.Clients{
+		Dynamic: client,
+		Mapper:  mapper,
+	})
 	return NewEditor(clusters{conn: conn}), client
 }
 

@@ -76,6 +76,8 @@ Clusters come from `clientcmd`'s default loading rules **plus** the paths in `co
 - A resource kind is **data**: `features/resources/kinds.ts` maps a nav leaf id to `{ gvr, namespaced, columns }`. Adding a kind is one `*.columns.tsx` file plus one entry — the table, the filter and the drawer's Overview all read the same `Column[]`.
 - `resource.store.ts` holds `Map<uid, object>` per subscription and applies incoming batches once per animation frame. `AppShell` reconciles subscriptions from `open tabs × active cluster`, so switching tabs never restarts an informer.
 - Open views are tabs (`features/tabs/tab.store.ts`); the sidebar and command palette open/focus a tab, they do not hold the current selection.
+- Anything you watch rather than read — logs now, shell in phase 5 — is a **dock tool** (`features/dock`), not a drawer tab. The drawer is for one object's static detail. Add a `DockTool.kind`, never a second panel.
+- Panels resize through `shared/ui/Resizer.tsx` and remember their size in `shared/ui/panel.size.ts`. Never hand-roll a drag handle.
 - Sidebar tree is static data in `features/navigation/nav.model.ts`; phase 6 replaces it with live discovery.
 
 ## Performance budget
