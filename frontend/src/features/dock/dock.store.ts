@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ResourceRef } from '@/features/resources/resource.types'
 
-export type DockKind = 'logs'
+export type DockKind = 'logs' | 'shell'
 
 export type DockTool = {
   id: string
@@ -9,6 +9,8 @@ export type DockTool = {
   title: string
   subtitle: string
   ref: ResourceRef
+  /** Set for a node shell: the terminal runs a privileged pod on this node. */
+  node?: string
 }
 
 type DockState = {
@@ -60,5 +62,26 @@ export function openLogsTool(ref: ResourceRef) {
     title: ref.name,
     subtitle: ref.namespace,
     ref,
+  })
+}
+
+export function openShellTool(ref: ResourceRef) {
+  useDock.getState().open({
+    id: `shell:${ref.uid}`,
+    kind: 'shell',
+    title: ref.name,
+    subtitle: ref.namespace,
+    ref,
+  })
+}
+
+export function openNodeShellTool(ref: ResourceRef) {
+  useDock.getState().open({
+    id: `shell:${ref.uid}`,
+    kind: 'shell',
+    title: ref.name,
+    subtitle: 'node',
+    ref,
+    node: ref.name,
   })
 }

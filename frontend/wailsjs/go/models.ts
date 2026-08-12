@@ -28,6 +28,28 @@ export namespace domain {
 	        this.error = source["error"];
 	    }
 	}
+	export class ContainerTarget {
+	    namespace: string;
+	    pod: string;
+	    container: string;
+	    role: string;
+	    state: string;
+	    restarts: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContainerTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.namespace = source["namespace"];
+	        this.pod = source["pod"];
+	        this.container = source["container"];
+	        this.role = source["role"];
+	        this.state = source["state"];
+	        this.restarts = source["restarts"];
+	    }
+	}
 	export class EventRecord {
 	    type: string;
 	    reason: string;
@@ -48,6 +70,40 @@ export namespace domain {
 	        this.source = source["source"];
 	        this.count = source["count"];
 	        this.last = source["last"];
+	    }
+	}
+	export class ExecOptions {
+	    command: string[];
+	    tty: boolean;
+	    cols: number;
+	    rows: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExecOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.command = source["command"];
+	        this.tty = source["tty"];
+	        this.cols = source["cols"];
+	        this.rows = source["rows"];
+	    }
+	}
+	export class ForwardPort {
+	    name: string;
+	    port: number;
+	    protocol: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForwardPort(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.port = source["port"];
+	        this.protocol = source["protocol"];
 	    }
 	}
 	export class GVR {
@@ -104,28 +160,6 @@ export namespace domain {
 	        this.previous = source["previous"];
 	    }
 	}
-	export class LogTarget {
-	    namespace: string;
-	    pod: string;
-	    container: string;
-	    role: string;
-	    state: string;
-	    restarts: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new LogTarget(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.namespace = source["namespace"];
-	        this.pod = source["pod"];
-	        this.container = source["container"];
-	        this.role = source["role"];
-	        this.state = source["state"];
-	        this.restarts = source["restarts"];
-	    }
-	}
 	export class OwnerRef {
 	    gvr: GVR;
 	    kind: string;
@@ -163,6 +197,36 @@ export namespace domain {
 		    }
 		    return a;
 		}
+	}
+	export class PortForward {
+	    id: string;
+	    clusterId: string;
+	    namespace: string;
+	    resource: string;
+	    name: string;
+	    pod: string;
+	    localPort: number;
+	    remotePort: number;
+	    status: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PortForward(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.clusterId = source["clusterId"];
+	        this.namespace = source["namespace"];
+	        this.resource = source["resource"];
+	        this.name = source["name"];
+	        this.pod = source["pod"];
+	        this.localPort = source["localPort"];
+	        this.remotePort = source["remotePort"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	    }
 	}
 	export class ResourceRef {
 	    clusterId: string;

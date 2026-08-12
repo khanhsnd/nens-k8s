@@ -9,7 +9,3 @@ export function Start(arg1, arg2, arg3, arg4) {
 export function Stop(arg1) {
   return window['go']['app']['LogAPI']['Stop'](arg1);
 }
-
-export function Targets(arg1) {
-  return window['go']['app']['LogAPI']['Targets'](arg1);
-}

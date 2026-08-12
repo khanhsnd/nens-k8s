@@ -12,7 +12,6 @@ import (
 	"nens-k8s/internal/kube/cluster"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
@@ -38,7 +37,7 @@ func NewStreamer(clusters Clusters, bus domain.Publisher) *Streamer {
 	}
 }
 
-func (s *Streamer) Start(token string, clusterID string, target domain.LogTarget, opts domain.LogOptions) error {
+func (s *Streamer) Start(token string, clusterID string, target domain.ContainerTarget, opts domain.LogOptions) error {
 	if token == "" {
 		return errors.New("stream token is required")
 	}
@@ -120,8 +119,4 @@ func logOptions(container string, opts domain.LogOptions) *corev1.PodLogOptions 
 		out.SinceSeconds = &opts.SinceSeconds
 	}
 	return out
-}
-
-func schemaGVR(gvr domain.GVR) schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 }

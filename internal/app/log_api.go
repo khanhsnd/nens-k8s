@@ -19,11 +19,7 @@ func (a *LogAPI) bind(ctx context.Context) {
 	a.ctx = ctx
 }
 
-func (a *LogAPI) Targets(ref domain.ResourceRef) ([]domain.LogTarget, error) {
-	return a.streams.Targets(a.ctx, ref)
-}
-
-func (a *LogAPI) Start(token string, clusterID string, target domain.LogTarget, opts domain.LogOptions) error {
+func (a *LogAPI) Start(token string, clusterID string, target domain.ContainerTarget, opts domain.LogOptions) error {
 	return a.streams.Start(token, clusterID, target, opts)
 }
 

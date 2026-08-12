@@ -87,6 +87,8 @@ func (c *Connection) Rename(name string) {
 	c.meta.Name = name
 }
 
+func (c *Connection) RESTConfig() *rest.Config { return c.clients.Config }
+
 func (c *Connection) Dynamic() dynamic.Interface { return c.clients.Dynamic }
 
 func (c *Connection) Clientset() kubernetes.Interface { return c.clients.Clientset }

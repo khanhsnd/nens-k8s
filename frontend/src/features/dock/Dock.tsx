@@ -1,11 +1,12 @@
-import { Maximize2, Minimize2, ScrollText, X, type LucideIcon } from 'lucide-react'
+import { Maximize2, Minimize2, ScrollText, SquareTerminal, X, type LucideIcon } from 'lucide-react'
 import { LogPanel } from '@/features/logs/LogPanel'
+import { TerminalPanel } from '@/features/terminal/TerminalPanel'
 import { cn } from '@/shared/lib/cn'
 import { usePanelSize } from '@/shared/ui/panel.size'
 import { Resizer } from '@/shared/ui/Resizer'
 import { useDock, type DockKind, type DockTool } from './dock.store'
 
-const ICONS: Record<DockKind, LucideIcon> = { logs: ScrollText }
+const ICONS: Record<DockKind, LucideIcon> = { logs: ScrollText, shell: SquareTerminal }
 
 const BOUNDS = { initial: 340, min: 140, max: 1400 }
 
@@ -96,6 +97,7 @@ export function Dock() {
           className={cn('min-h-0 flex-1 flex-col', tool.id === activeId ? 'flex' : 'hidden')}
         >
           {tool.kind === 'logs' && <LogPanel target={tool.ref} />}
+          {tool.kind === 'shell' && <TerminalPanel target={tool.ref} node={tool.node} />}
         </div>
       ))}
     </section>

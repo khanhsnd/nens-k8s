@@ -59,11 +59,26 @@ Exit: verified against fixtures (browser dev server) and the fake clientset + fa
 `GetLogs` has never run against a real API server. Streaming the logs of a *workload* (deployment →
 all its pods) is wired end to end but only exercised by fixtures.
 
-## Phase 5 — Exec + port-forward
+## Phase 5 — Exec + port-forward (done)
 
-- `ExecAPI`: `remotecommand.NewSPDYExecutor`, bidirectional stream bridged to xterm, resize via `TerminalSizeQueue`.
-- `PortForwardAPI`: `portforward.New` with a `Registry` of active forwards, surfaced in the Network → Port Forwarding view.
-- Node shell (privileged debug pod) reuses the same ExecAPI.
+- `internal/kube/pods`: container resolution moved out of `logs` — one `ContainerAPI.Targets(ref)`
+  serves both the Logs and the Shell panel, and `domain.LogTarget` became `domain.ContainerTarget`.
+- `internal/kube/exec.Runner`: `remotecommand.NewSPDYExecutor` per session, stdout batched into one
+  `exec:data` event per 16ms (base64), keystrokes written through an `io.Pipe`, resize through a
+  latest-wins `TerminalSizeQueue`. `ExecAPI.Start` / `NodeShell` / `Send` / `Resize` / `Stop`.
+- Node shell: `NodeShell` creates a privileged `hostPID` pod on the node, waits for Running, attaches
+  `nsenter --target 1`, and deletes the pod when the session ends — one call owns that lifetime.
+- `internal/kube/forward.Registry`: `portforward.New` per forward, `forward:changed` on every state
+  change, local port 0 resolved from `GetPorts()` once ready, a forward dies with its cluster
+  connection. `PortForwardAPI.Ports` / `Start` / `List` / `Stop`.
+- `features/terminal`: xterm.js + fit addon as a second `DockTool.kind`, container and shell pickers,
+  reconnect, theme-aware palette. `features/portforward`: the Network → Port Forwarding view over the
+  same `DataGrid`, a per-port panel in the drawer's Overview, and a `Forwarded` column on Services.
+
+Exit: verified against fixtures (browser dev server), the fake clientset and the fake dynamic client.
+`remotecommand` and `portforward` have never run against a real API server; the node shell has never
+created a real pod. xterm rendering could not be verified in the headless browser pane (it never
+composites, so `requestAnimationFrame` never fires) — the data path was verified module by module.
 
 ## Phase 6 — Discovery + CRDs
 

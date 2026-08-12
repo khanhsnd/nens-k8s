@@ -1,20 +1,5 @@
 package domain
 
-const (
-	ContainerRoleInit      = "init"
-	ContainerRoleApp       = "app"
-	ContainerRoleEphemeral = "ephemeral"
-)
-
-type LogTarget struct {
-	Namespace string `json:"namespace"`
-	Pod       string `json:"pod"`
-	Container string `json:"container"`
-	Role      string `json:"role"`
-	State     string `json:"state"`
-	Restarts  int64  `json:"restarts"`
-}
-
 type LogOptions struct {
 	Follow       bool  `json:"follow"`
 	TailLines    int64 `json:"tailLines"`

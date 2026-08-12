@@ -1,10 +1,11 @@
-package logs
+package pods
 
 import (
 	"context"
 	"fmt"
 
 	"nens-k8s/internal/domain"
+	"nens-k8s/internal/kube/cluster"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -13,9 +14,74 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const podLimit = 200
+const limit = 200
 
-var podsGVR = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+var GVR = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+
+type Clusters interface {
+	Connection(id string) (*cluster.Connection, bool)
+}
+
+type Resolver struct {
+	clusters Clusters
+}
+
+func NewResolver(clusters Clusters) *Resolver {
+	return &Resolver{clusters: clusters}
+}
+
+// Targets resolves anything that owns pods — a pod, a workload with a
+// LabelSelector, a service — into the containers a stream can attach to.
+func (r *Resolver) Targets(ctx context.Context, ref domain.ResourceRef) ([]domain.ContainerTarget, error) {
+	conn, ok := r.clusters.Connection(ref.ClusterID)
+	if !ok {
+		return nil, fmt.Errorf("cluster %q is not connected", ref.ClusterID)
+	}
+
+	found, err := Selected(ctx, conn, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	targets := make([]domain.ContainerTarget, 0, len(found))
+	for i := range found {
+		targets = append(targets, containersOf(&found[i])...)
+	}
+	return targets, nil
+}
+
+func Get(ctx context.Context, conn *cluster.Connection, ref domain.ResourceRef) (*unstructured.Unstructured, error) {
+	return conn.Dynamic().Resource(SchemaGVR(ref.GVR)).Namespace(ref.Namespace).
+		Get(ctx, ref.Name, metav1.GetOptions{})
+}
+
+// Selected is the pod itself when ref points at one, and whatever its selector
+// matches otherwise.
+func Selected(ctx context.Context, conn *cluster.Connection, ref domain.ResourceRef) ([]unstructured.Unstructured, error) {
+	object, err := Get(ctx, conn, ref)
+	if err != nil {
+		return nil, err
+	}
+	if SchemaGVR(ref.GVR) == GVR {
+		return []unstructured.Unstructured{*object}, nil
+	}
+
+	selector, err := selectorOf(object)
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := conn.Dynamic().Resource(GVR).Namespace(ref.Namespace).
+		List(ctx, metav1.ListOptions{LabelSelector: selector, Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+func SchemaGVR(gvr domain.GVR) schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
+}
 
 var containerGroups = []struct {
 	path []string
@@ -32,45 +98,9 @@ var statusPaths = [][]string{
 	{"status", "ephemeralContainerStatuses"},
 }
 
-// Targets resolves anything that owns pods — a pod, a workload with a
-// LabelSelector, a service — into the containers whose logs can be streamed.
-func (s *Streamer) Targets(ctx context.Context, ref domain.ResourceRef) ([]domain.LogTarget, error) {
-	conn, ok := s.clusters.Connection(ref.ClusterID)
-	if !ok {
-		return nil, fmt.Errorf("cluster %q is not connected", ref.ClusterID)
-	}
-
-	object, err := conn.Dynamic().Resource(schemaGVR(ref.GVR)).Namespace(ref.Namespace).
-		Get(ctx, ref.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	if schemaGVR(ref.GVR) == podsGVR {
-		return containersOf(object), nil
-	}
-
-	selector, err := selectorOf(object)
-	if err != nil {
-		return nil, err
-	}
-
-	pods, err := conn.Dynamic().Resource(podsGVR).Namespace(ref.Namespace).
-		List(ctx, metav1.ListOptions{LabelSelector: selector, Limit: podLimit})
-	if err != nil {
-		return nil, err
-	}
-
-	targets := make([]domain.LogTarget, 0, len(pods.Items))
-	for i := range pods.Items {
-		targets = append(targets, containersOf(&pods.Items[i])...)
-	}
-	return targets, nil
-}
-
-func containersOf(pod *unstructured.Unstructured) []domain.LogTarget {
+func containersOf(pod *unstructured.Unstructured) []domain.ContainerTarget {
 	states := containerStates(pod)
-	targets := make([]domain.LogTarget, 0, 4)
+	targets := make([]domain.ContainerTarget, 0, 4)
 
 	for _, group := range containerGroups {
 		items, _, _ := unstructured.NestedSlice(pod.Object, group.path...)
@@ -82,7 +112,7 @@ func containersOf(pod *unstructured.Unstructured) []domain.LogTarget {
 			}
 
 			state := states[name]
-			targets = append(targets, domain.LogTarget{
+			targets = append(targets, domain.ContainerTarget{
 				Namespace: pod.GetNamespace(),
 				Pod:       pod.GetName(),
 				Container: name,

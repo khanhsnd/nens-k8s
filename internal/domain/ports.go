@@ -50,10 +50,28 @@ type ResourceEditor interface {
 	Events(ctx context.Context, ref ResourceRef) ([]EventRecord, error)
 }
 
+type ContainerResolver interface {
+	Targets(ctx context.Context, ref ResourceRef) ([]ContainerTarget, error)
+}
+
 type LogStreamer interface {
-	Targets(ctx context.Context, ref ResourceRef) ([]LogTarget, error)
-	Start(token string, clusterID string, target LogTarget, opts LogOptions) error
+	Start(token string, clusterID string, target ContainerTarget, opts LogOptions) error
 	Stop(token string) error
+}
+
+type ExecRunner interface {
+	Start(token string, clusterID string, target ContainerTarget, opts ExecOptions) error
+	NodeShell(ctx context.Context, token string, clusterID string, node string, opts ExecOptions) error
+	Send(token string, data string) error
+	Resize(token string, cols uint16, rows uint16) error
+	Stop(token string) error
+}
+
+type PortForwarder interface {
+	Ports(ctx context.Context, ref ResourceRef) ([]ForwardPort, error)
+	Start(ctx context.Context, ref ResourceRef, localPort int, remotePort int) (PortForward, error)
+	List() []PortForward
+	Stop(id string) error
 }
 
 type Publisher interface {

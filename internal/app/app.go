@@ -7,8 +7,11 @@ import (
 	"nens-k8s/internal/domain"
 	"nens-k8s/internal/event"
 	"nens-k8s/internal/kube/cluster"
+	"nens-k8s/internal/kube/exec"
+	"nens-k8s/internal/kube/forward"
 	"nens-k8s/internal/kube/kubeconfig"
 	"nens-k8s/internal/kube/logs"
+	"nens-k8s/internal/kube/pods"
 	"nens-k8s/internal/kube/resource"
 )
 
@@ -18,7 +21,10 @@ type App struct {
 	clusters    *ClusterAPI
 	kubeconfigs *KubeconfigAPI
 	resources   *ResourceAPI
+	containers  *ContainerAPI
 	logs        *LogAPI
+	shells      *ExecAPI
+	forwards    *PortForwardAPI
 
 	ctx context.Context
 }
@@ -33,7 +39,10 @@ func New() *App {
 		clusters:    NewClusterAPI(registry),
 		kubeconfigs: NewKubeconfigAPI(loader),
 		resources:   NewResourceAPI(resource.NewStore(registry, bus), resource.NewEditor(registry)),
+		containers:  NewContainerAPI(pods.NewResolver(registry)),
 		logs:        NewLogAPI(logs.NewStreamer(registry, bus)),
+		shells:      NewExecAPI(exec.NewRunner(registry, bus)),
+		forwards:    NewPortForwardAPI(forward.NewRegistry(registry, bus)),
 	}
 }
 
@@ -43,7 +52,10 @@ func (a *App) Startup(ctx context.Context) {
 	a.clusters.bind(ctx)
 	a.kubeconfigs.bind(ctx)
 	a.resources.bind(ctx)
+	a.containers.bind(ctx)
 	a.logs.bind(ctx)
+	a.shells.bind(ctx)
+	a.forwards.bind(ctx)
 }
 
 func (a *App) Shutdown(_ context.Context) {
@@ -51,5 +63,13 @@ func (a *App) Shutdown(_ context.Context) {
 }
 
 func (a *App) Bindings() []any {
-	return []any{a.clusters, a.kubeconfigs, a.resources, a.logs}
+	return []any{
+		a.clusters,
+		a.kubeconfigs,
+		a.resources,
+		a.containers,
+		a.logs,
+		a.shells,
+		a.forwards,
+	}
 }

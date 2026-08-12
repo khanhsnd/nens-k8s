@@ -7,12 +7,15 @@ import {
 import { Dock } from '@/features/dock/Dock'
 import { useDock } from '@/features/dock/dock.store'
 import { subscribeLogEvents } from '@/features/logs/log.store'
+import { PortForwardView } from '@/features/portforward/PortForwardView'
+import { subscribeForwardEvents, useForwards } from '@/features/portforward/portforward.store'
 import { DiscardGuard } from '@/features/resources/DiscardGuard'
 import { useEditorGuard } from '@/features/resources/editor.store'
 import { kindFor, type Kind } from '@/features/resources/kinds'
 import { sliceKey, subscribeResourceEvents, useResources } from '@/features/resources/resource.store'
 import { ResourceView } from '@/features/resources/ResourceView'
 import { TabBar } from '@/features/tabs/TabBar'
+import { subscribeExecEvents } from '@/features/terminal/terminal.store'
 import { activeTab, useTabs } from '@/features/tabs/tab.store'
 import { cn } from '@/shared/lib/cn'
 import { Placeholder } from '@/shared/ui/Placeholder'
@@ -44,6 +47,13 @@ export function AppShell() {
 
   useEffect(() => subscribeLogEvents(), [])
 
+  useEffect(() => subscribeExecEvents(), [])
+
+  useEffect(() => {
+    void useForwards.getState().load()
+    return subscribeForwardEvents()
+  }, [])
+
   useEffect(() => {
     const kinds = tabs
       .map((item) => kindFor(item.leafId))
@@ -59,6 +69,7 @@ export function AppShell() {
 
   function content() {
     if (!tab) return <Placeholder label="No open tab — pick a resource from the sidebar" />
+    if (tab.leafId === 'portforward') return <PortForwardView />
     if (!kind) return <Placeholder label={`${tab.title} — not wired up yet`} />
     if (!key) return <Placeholder label="Select a cluster to load resources" />
 

@@ -14,9 +14,10 @@ import {
   WrapText,
   type LucideIcon,
 } from 'lucide-react'
+import type { ContainerTarget } from '@/features/containers/container.types'
 import { cn } from '@/shared/lib/cn'
 import { CAPACITIES } from './log.buffer'
-import type { LogSearch, LogTarget } from './log.types'
+import type { LogSearch } from './log.types'
 import { TargetPicker } from './TargetPicker'
 
 export type LogControls = {
@@ -128,7 +129,7 @@ export function LogToolbar({
   onCopy,
   onDownload,
 }: {
-  targets: LogTarget[]
+  targets: ContainerTarget[]
   selection: string[]
   onSelection: (selection: string[]) => void
   controls: LogControls

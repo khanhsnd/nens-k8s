@@ -1,11 +1,11 @@
 import * as Menu from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronDown } from 'lucide-react'
+import { targetKey, type ContainerTarget } from '@/features/containers/container.types'
 import { cn } from '@/shared/lib/cn'
-import { targetKey, type LogTarget } from './log.types'
 
 const ROLES: Record<string, string> = { init: 'init', ephemeral: 'debug' }
 
-function summary(targets: LogTarget[], selection: string[]): string {
+function summary(targets: ContainerTarget[], selection: string[]): string {
   if (selection.length === 0) return 'no container'
   if (selection.length === 1) return selection[0].split('/')[1]
 
@@ -14,8 +14,8 @@ function summary(targets: LogTarget[], selection: string[]): string {
   return `${selection.length} containers`
 }
 
-function byPod(targets: LogTarget[]): Array<[string, LogTarget[]]> {
-  const pods = new Map<string, LogTarget[]>()
+function byPod(targets: ContainerTarget[]): Array<[string, ContainerTarget[]]> {
+  const pods = new Map<string, ContainerTarget[]>()
   for (const target of targets) {
     pods.set(target.pod, [...(pods.get(target.pod) ?? []), target])
   }
@@ -27,7 +27,7 @@ export function TargetPicker({
   selection,
   onChange,
 }: {
-  targets: LogTarget[]
+  targets: ContainerTarget[]
   selection: string[]
   onChange: (selection: string[]) => void
 }) {

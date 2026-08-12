@@ -27,6 +27,7 @@ export type Column<T> = {
 
 const ROW_HEIGHT = 30
 const ACTIONS_WIDTH = 36
+const ROW_ACTIONS_WIDTH = 76
 const AUTOSCROLL_EDGE = 28
 const AUTOSCROLL_SPEED = 12
 const REORDER_THRESHOLD = 6
@@ -49,6 +50,7 @@ export function DataGrid<T>({
   rowKey,
   activeKey,
   onActivate,
+  rowActions,
 }: {
   layoutId: string
   rows: T[]
@@ -56,7 +58,10 @@ export function DataGrid<T>({
   rowKey: (row: T) => string
   activeKey?: string | null
   onActivate?: (row: T) => void
+  /** Fills the sticky last cell instead of the open-details button. */
+  rowActions?: (row: T) => ReactNode
 }) {
+  const actionsWidth = rowActions ? ROW_ACTIONS_WIDTH : ACTIONS_WIDTH
   const scrollRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const pointer = useRef({ x: 0, y: 0 })
@@ -239,7 +244,7 @@ export function DataGrid<T>({
         </div>
 
         <div
-          style={{ width: ACTIONS_WIDTH }}
+          style={{ width: actionsWidth }}
           className="grid shrink-0 place-items-center border-l border-line/60"
         >
           <ColumnMenu
@@ -263,7 +268,7 @@ export function DataGrid<T>({
         className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll outline-none [scrollbar-gutter:stable]"
       >
         <div
-          style={{ height: virtualizer.getTotalSize(), minWidth: columnsWidth + ACTIONS_WIDTH }}
+          style={{ height: virtualizer.getTotalSize(), minWidth: columnsWidth + actionsWidth }}
           className="relative"
         >
           {virtualizer.getVirtualItems().map((item) => {
@@ -284,8 +289,8 @@ export function DataGrid<T>({
                 style={{
                   transform: `translateY(${item.start}px)`,
                   height: ROW_HEIGHT,
-                  gridTemplateColumns: `${template} ${ACTIONS_WIDTH}px`,
-                  minWidth: columnsWidth + ACTIONS_WIDTH,
+                  gridTemplateColumns: `${template} ${actionsWidth}px`,
+                  minWidth: columnsWidth + actionsWidth,
                 }}
                 className={cn(
                   'absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-[12.5px]',
@@ -316,34 +321,40 @@ export function DataGrid<T>({
                       }}
                       onDoubleClick={() => onActivate?.(row)}
                       style={{
-                        lineHeight: `${ROW_HEIGHT}px`,
                         boxShadow: inRange ? edgeShadow(item.index, c, rect, focused) : undefined,
                       }}
                       className={cn(
-                        'cursor-cell truncate border-r border-line/40 px-3 text-muted',
+                        'flex cursor-cell items-center border-r border-line/40 px-3 text-muted',
                         inRange && !focused && 'bg-accent-dim',
                       )}
                     >
-                      {column.cell ? column.cell(row) : column.text(row)}
+                      {/* The cell centres its content with flexbox rather than a row-height
+                          line-height: a bordered chip that inherited 30px of leading grew taller
+                          than the row it sits in, and a block-level cell renderer hugged its top. */}
+                      <span className="min-w-0 flex-1 truncate">
+                        {column.cell ? column.cell(row) : column.text(row)}
+                      </span>
                     </div>
                   )
                 })}
 
                 <div
                   className={cn(
-                    'sticky right-0 grid place-items-center border-l border-line/40',
+                    'sticky right-0 flex items-center justify-center gap-1 border-l border-line/40',
                     background,
                   )}
                 >
-                  {onActivate && (
-                    <button
-                      onClick={() => onActivate(row)}
-                      title="Open details"
-                      className="grid size-6 place-items-center rounded text-faint transition-colors hover:bg-overlay hover:text-text"
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </button>
-                  )}
+                  {rowActions
+                    ? rowActions(row)
+                    : onActivate && (
+                        <button
+                          onClick={() => onActivate(row)}
+                          title="Open details"
+                          className="grid size-6 place-items-center rounded text-faint transition-colors hover:bg-overlay hover:text-text"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </button>
+                      )}
                 </div>
               </div>
             )

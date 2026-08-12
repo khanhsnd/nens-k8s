@@ -1,3 +1,4 @@
+import { forwardedColumn } from '@/features/portforward/forwarded.column'
 import { AGE_COLUMN, NAME_COLUMN, NAMESPACE_COLUMN } from './common.columns'
 import type { K8sObject, ResourceColumn } from './resource.types'
 
@@ -35,5 +36,6 @@ export const SERVICE_COLUMNS: ResourceColumn[] = [
   },
   { key: 'externalIP', label: 'External IP', min: 120, grow: 0.7, text: externalIP },
   { key: 'ports', label: 'Ports', min: 140, grow: 1, text: ports },
+  forwardedColumn('services'),
   AGE_COLUMN,
 ]

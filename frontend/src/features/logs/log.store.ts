@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { EventsOn } from '@bindings/runtime/runtime'
+import { targetKey, type ContainerTarget } from '@/features/containers/container.types'
 import { LogBuffer } from './log.buffer'
 import { startLogStream, stopLogStream } from './log.api'
-import { targetKey, type LogChunk, type LogOptions, type LogTarget } from './log.types'
+import type { LogChunk, LogOptions } from './log.types'
 
 export type LogSession = {
   buffer: LogBuffer
-  targets: LogTarget[]
+  targets: ContainerTarget[]
   live: number
   error: string | null
   version: number
@@ -22,7 +23,7 @@ const owners = new Map<string, { id: string; label: string }>()
 let counter = 0
 
 /** Prefix each line only when more than one stream feeds the same buffer. */
-function labeller(targets: LogTarget[]): (target: LogTarget) => string {
+function labeller(targets: ContainerTarget[]): (target: ContainerTarget) => string {
   if (targets.length < 2) return () => ''
   if (new Set(targets.map((target) => target.pod)).size > 1) return targetKey
   return (target) => target.container
@@ -31,7 +32,7 @@ function labeller(targets: LogTarget[]): (target: LogTarget) => string {
 export async function openLogs(
   id: string,
   clusterId: string,
-  targets: LogTarget[],
+  targets: ContainerTarget[],
   opts: LogOptions,
   capacity: number,
 ) {

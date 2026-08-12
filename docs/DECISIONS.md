@@ -357,6 +357,167 @@ container that has already died.
 the footer can show a real gap. Dropping the *newest* would be the obvious alternative and is wrong —
 when a pod floods, the lines you want are the ones it just wrote.
 
+## Phase 5 — exec and port-forward
+
+### Container resolution left `logs` and became its own adapter
+
+`logs.Streamer.Targets` answered "what can I attach to" for the Logs panel. A shell asks the same
+question, so the resolution moved to `internal/kube/pods` (`Resolver.Targets`, plus `Selected`/`Get`
+as the pod lookup the forward registry also needs) and `domain.LogTarget` became
+`domain.ContainerTarget`. One binding — `ContainerAPI.Targets` — now serves both panels, and
+`features/containers` mirrors it on the frontend so `features/terminal` never imports
+`features/logs`.
+
+The alternative was a second resolver for exec: ~150 lines of Go and ~80 of fixtures duplicated, and
+two answers to one question that would drift.
+
+### xterm.js here, but not for logs
+
+Phase 4 rejected xterm.js because a terminal emulator cannot filter its own scrollback. Exec is the
+opposite case: it needs input, cursor addressing, escape sequences and a real cell grid, and none of
+the log panel's features (filter, match stepping, wrap toggle) apply. So the two panels deliberately
+do not share a renderer — they only share the container picker's data.
+
+The terminal's palette is read from the CSS custom properties, not hardcoded, and re-read when
+`theme.store` flips, because xterm paints its own cells and cannot inherit Tailwind tokens.
+
+### Output is base64 bytes, input is a plain string
+
+`ExecChunk.Data` is base64: a terminal writes arbitrary bytes and a multi-byte rune can straddle two
+reads, so decoding on the Go side would corrupt it. The frontend decodes to a `Uint8Array` and hands
+it to `Terminal.write`, which owns UTF-8 reassembly across chunks.
+
+`Send(token, data)` takes the string xterm's `onData` produced — keystrokes and escape sequences are
+text by construction, and `[]byte(s)` is the exact wire form the API server wants.
+
+### The output sink never drops, and flushes early instead
+
+`logs.sink` drops the oldest lines past its window because a flooding pod's newest lines are the
+interesting ones. A terminal cannot do that: dropping bytes truncates an escape sequence and corrupts
+everything after it. So `exec.sink` batches on a 16ms window (one frame — echo latency is felt, unlike
+log latency) and flushes immediately past 64KB rather than dropping anything.
+
+The frontend does not coalesce on top of that: xterm has its own write queue, and a second buffer
+would only add latency.
+
+### The size queue is latest-wins, and closing it is what stops the goroutine
+
+A resize nobody has read yet is worthless once the window has moved again, so `sizeQueue` holds one
+size and replaces it. It must also be closed: `remotecommand` runs a goroutine blocked in `Next()`
+for the life of the stream, and only a `nil` return — which a closed channel produces — makes it
+exit. Every teardown therefore goes through `Runner.close`, which closes the queue, closes the stdin
+pipe and cancels the context.
+
+### Keystrokes go through an `io.Pipe`, which is synchronous on purpose
+
+`Send` blocks until the stream consumes the bytes, which is the backpressure a terminal wants and
+what `kubectl` does with `os.Stdin`. The failure mode — a wedged connection leaving a `Send` promise
+pending — is bounded: `Stop` closes the pipe writer and every blocked `Write` returns
+`ErrClosedPipe`. Buffering keystrokes into a channel instead would need a second goroutine to keep
+their order, for a case where the terminal is already unusable.
+
+### The executor is built behind a seam, and the URL is asserted separately
+
+`Runner.dial` defaults to `remotecommand.NewSPDYExecutor` and is replaced in tests, because the fake
+clientset's `RESTClient()` is a nil `*rest.RESTClient` — `Post()` on it panics, so an exec URL cannot
+be built from it at all. `execURL` is therefore tested against a real clientset dialled at an
+unreachable host (building a URL touches no network), and the session state machine is tested against
+a fake executor. Nothing in the exec package needs an API server to be covered.
+
+### The node shell is one call that owns the pod
+
+`NodeShell(token, cluster, node, opts)` creates the privileged pod, waits for Running, attaches
+`nsenter --target 1 --mount --uts --ipc --net --pid -- sh -l`, and registers the pod's deletion as
+the session's cleanup. Exposing "create a debug pod" to the frontend was the obvious alternative and
+leaks pods: the frontend would own the delete, and a closed window, a reload or a failed attach would
+each leave a privileged pod behind. The container itself only sleeps — the shell enters the host's
+namespaces through PID 1 — so the image needs nothing but `nsenter`.
+
+### A forward carries its own id, so it needs no client-supplied token
+
+Resource subscriptions and log streams take a frontend token because their first event races the
+call's return (see above). A `PortForward` event carries the whole record, id included, so a store
+keyed by id can apply an event that arrives before `Start` resolves. `Start` still returns the
+`starting` record, and `forward:changed` reports every transition after it.
+
+### `finish` is the only teardown path
+
+`Stop` and `ForwardPorts` returning are two racing ends of the same forward, so both go through
+`finish`, and membership in the registry map decides which one reports the final state — the loser
+finds the entry gone and stays quiet. That is also why `Stop` closes the stop channel rather than
+calling `PortForwarder.Close`: one signal, and `ForwardPorts` unwinds itself.
+
+Each forward also gets a goroutine on the cluster connection's context, because `portforward` takes a
+stop channel and not a context. Without it a forward would outlive the cluster it points at.
+
+### Local port 0 is the default, and `GetPorts()` is when it becomes real
+
+Asking the kernel for a port is what avoids "address already in use" on every second forward, so the
+dialog's local port is optional. The actual number only exists after the ready channel fires, which
+is what `activate` waits for and publishes — the row shows `starting` until then.
+
+For a service, the forwarded number is its `targetPort` when that is numeric: the tunnel lands on a
+pod, so the service port would be the wrong number. A named `targetPort` cannot be resolved without
+the pod's container spec, so it falls back to the service port and the user can correct it.
+
+### Port Forwarding is a view over the registry, not a resource kind
+
+It has no GVR and no informer, so it is not in `kinds.ts` and `AppShell` renders it from the leaf id.
+Its rows still go through `shared/ui/DataGrid` with a `Column<PortForward>[]` spec, so virtualization,
+selection, copy and the column menu come for free — the grid was already generic over its row type.
+
+### A grid cell centres its content with flexbox, never with the row's line-height
+
+The cell used to set `line-height: 30px` (the row height) to centre its text, and that is what made
+bordered chips overflow their row: an `inline-flex` pill *inherits* that leading, so a 10.5px label
+became a ~32px box inside a 30px row and got clipped. The workaround of resetting leading per chip
+only moved the problem — a cell renderer that is block-level (`flex`) ignores the line box entirely
+and hugs the top of the row instead.
+
+So the cell is now `flex items-center` with its content in one `min-w-0 flex-1 truncate` span:
+vertical centring comes from flexbox and applies to text and components alike, and truncation still
+lives on a single element that owns the ellipsis. `shared/ui/Badge.tsx` also grew a `Pill` primitive
+with a fixed height and `leading-none`, so chips have one definition instead of an ad-hoc span per
+call site.
+
+The rule this file exists to record: **anything a column renders must not depend on the cell's
+typography to size itself.** Measure a chip against its row (`getBoundingClientRect`) before calling
+it done — this class of bug is invisible until a border is drawn around it.
+
+### Row actions fill the sticky cell, they are not a column of their own
+
+Copy and Stop first shipped as a last `Column` with `min: 62`, which put them left of the grid's own
+36px sticky actions cell: two buttons crammed into a normal cell, then an empty gutter, misaligned
+with the header's column menu. `DataGrid` now takes `rowActions?: (row) => ReactNode` that fills the
+sticky cell instead of the open-details button, and widens that track to 76px when it is used. The
+header's menu cell reads the same width, so the two stay aligned — which is the whole reason the
+actions cell is a real grid track (see "The row actions cell is the last grid column").
+
+Forwards therefore keep a pure `FORWARD_COLUMNS` data spec, and the view owns its buttons.
+
+### Forwarding lives in the drawer's Overview, not behind a header icon
+
+The icon in the drawer header opened a dialog that asked for the port a second time — the object's
+ports were already known. `features/portforward/ForwardPanel` renders one row per declared port
+(`ContainerPort` for pods and workloads, the pod-side `targetPort` for services) with an inline local
+port field, and flips that row to the live address plus Copy/Stop once the forward is up. So the
+question the panel answers is "which of these ports do I want", not "type a number", and stopping a
+forward is where starting it was.
+
+`ObjectOverview` renders it whenever `kind.forward` is set, so this is still one capability flag in
+`kinds.ts` and not a per-kind component. The header keeps only the actions that have nowhere else to
+live (Logs, Shell, Scale, Copy, Delete).
+
+### The `Forwarded` column reads the registry, not the object
+
+Nothing on a Service says it is being forwarded — that state lives in the forward registry. So
+`forwardedColumn(resource)` renders a component that subscribes to `useForwards`, and matches on
+cluster + namespace + name + resource. Resource is part of the key because a Deployment and its
+Service usually share a name, and matching on the name alone would light up the wrong row.
+
+Its `text()` — what Ctrl+C copies — reads the same state imperatively through `getState()`, because a
+`Column` is data and cannot hold a hook.
+
 ## Cluster switching
 
 ### The icon rail became one tree: clusters are the top level of the nav

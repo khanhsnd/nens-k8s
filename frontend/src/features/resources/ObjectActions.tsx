@@ -1,6 +1,6 @@
-import { Copy, Scaling, ScrollText, Trash2, type LucideIcon } from 'lucide-react'
+import { Copy, Scaling, ScrollText, SquareTerminal, Trash2, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
-import { openLogsTool } from '@/features/dock/dock.store'
+import { openLogsTool, openNodeShellTool, openShellTool } from '@/features/dock/dock.store'
 import { cn } from '@/shared/lib/cn'
 import { copyText } from '@/shared/lib/clipboard'
 import { Dialog } from '@/shared/ui/Dialog'
@@ -163,6 +163,16 @@ export function ObjectActions({
     <>
       {kind.logs && (
         <Action icon={ScrollText} label="Logs" onClick={() => openLogsTool(target)} />
+      )}
+      {kind.shell && (
+        <Action icon={SquareTerminal} label="Shell" onClick={() => openShellTool(target)} />
+      )}
+      {kind.nodeShell && (
+        <Action
+          icon={SquareTerminal}
+          label="Node shell"
+          onClick={() => openNodeShellTool(target)}
+        />
       )}
       {typeof replicas === 'number' && (
         <Action icon={Scaling} label="Scale…" onClick={() => setDialog('scale')} />

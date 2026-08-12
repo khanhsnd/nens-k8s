@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ResourceRef } from '@/features/resources/resource.types'
 import { copyText } from '@/shared/lib/clipboard'
 import { downloadText } from '@/shared/lib/download'
+import { listContainers } from '@/features/containers/container.api'
+import { targetKey, type ContainerTarget } from '@/features/containers/container.types'
 import { CAPACITIES } from './log.buffer'
-import { listLogTargets } from './log.api'
 import { EMPTY_SEARCH } from './log.search'
 import { closeLogs, openLogs, touchLogs, useLogs } from './log.store'
-import { targetKey, type LogSearch, type LogTarget } from './log.types'
+import type { LogSearch } from './log.types'
 import { LogToolbar, type LogControls } from './LogToolbar'
 import { LogView } from './LogView'
 
@@ -21,7 +22,7 @@ const DEFAULTS: LogControls = {
 }
 
 /** Every app container of the first pod — one rule that fits a pod and a workload. */
-function defaultSelection(targets: LogTarget[]): string[] {
+function defaultSelection(targets: ContainerTarget[]): string[] {
   const first = targets[0]?.pod
   return targets
     .filter((target) => target.pod === first && target.role === 'app')
@@ -32,7 +33,7 @@ export function LogPanel({ target }: { target: ResourceRef }) {
   const id = `logs:${target.uid}`
   const session = useLogs((state) => state.sessions[id])
 
-  const [targets, setTargets] = useState<LogTarget[] | null>(null)
+  const [targets, setTargets] = useState<ContainerTarget[] | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [selection, setSelection] = useState<string[]>([])
   const [controls, setControls] = useState(DEFAULTS)
@@ -44,7 +45,7 @@ export function LogPanel({ target }: { target: ResourceRef }) {
     setTargets(null)
     setFailed(null)
 
-    listLogTargets(target)
+    listContainers(target)
       .then((found) => {
         if (!live) return
         setTargets(found)

@@ -1,5 +1,6 @@
 import { CornerDownRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { ForwardPanel } from '@/features/portforward/ForwardPanel'
 import type { Kind } from './kinds'
 import { listOwners } from './object.api'
 import type { K8sObject, OwnerRef, ResourceRef } from './resource.types'
@@ -72,6 +73,8 @@ export function ObjectOverview({
           ))}
         <Field label="UID" value={object.metadata.uid} />
       </dl>
+
+      {kind.forward && <ForwardPanel target={target} />}
 
       {owners.length > 0 && <OwnerChain owners={owners} />}
 

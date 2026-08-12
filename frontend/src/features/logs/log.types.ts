@@ -1,14 +1,3 @@
-export type ContainerRole = 'init' | 'app' | 'ephemeral'
-
-export type LogTarget = {
-  namespace: string
-  pod: string
-  container: string
-  role: ContainerRole
-  state: string
-  restarts: number
-}
-
 export type LogOptions = {
   follow: boolean
   tailLines: number
@@ -38,5 +27,3 @@ export type LogSearch = {
   caseSensitive: boolean
   filter: boolean
 }
-
-export const targetKey = (target: LogTarget) => `${target.pod}/${target.container}`

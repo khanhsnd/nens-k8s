@@ -11,6 +11,8 @@ const (
 	TopicClusterChanged = "cluster:changed"
 	TopicResourceEvent  = "resource:event"
 	TopicLogChunk       = "log:chunk"
+	TopicExecData       = "exec:data"
+	TopicForwardChanged = "forward:changed"
 )
 
 type Bus struct {
