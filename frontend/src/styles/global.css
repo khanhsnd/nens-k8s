@@ -25,7 +25,26 @@
   --font-sans: 'Segoe UI Variable Text', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Cascadia Mono', 'JetBrains Mono', ui-monospace, monospace;
 
+  /* One type scale, all of it a ratio of --app-font-size, which the appearance
+     settings rewrite at runtime. Sizes are px multiples of the 13px default, so
+     nothing else in the layout moves when the text grows. `text-base` is left
+     alone on purpose: it is the base *colour*. */
+  --text-2xs: calc(var(--app-font-size) * 0.769);
+  --text-2xs--line-height: 1.5;
+  --text-xs: calc(var(--app-font-size) * 0.885);
+  --text-xs--line-height: 1.5;
+  --text-sm: calc(var(--app-font-size) * 0.923);
+  --text-sm--line-height: 1.5;
+  --text-md: var(--app-font-size);
+  --text-md--line-height: 1.5;
+  --text-lg: calc(var(--app-font-size) * 1.154);
+  --text-lg--line-height: 1.4;
+
   --radius-panel: 10px;
+}
+
+:root {
+  --app-font-size: 13px;
 }
 
 .dark {
@@ -65,7 +84,7 @@
     background: var(--color-base);
     color: var(--color-text);
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: var(--app-font-size);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;

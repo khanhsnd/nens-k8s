@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"sync"
 
@@ -43,6 +44,7 @@ type dialer func(
 type Registry struct {
 	clusters Clusters
 	bus      domain.Publisher
+	store    domain.ForwardStore
 	dial     dialer
 
 	mu       sync.Mutex
@@ -52,14 +54,16 @@ type Registry struct {
 
 type forward struct {
 	meta domain.PortForward
+	spec domain.ForwardSpec
 	stop chan struct{}
 	once sync.Once
 }
 
-func NewRegistry(clusters Clusters, bus domain.Publisher) *Registry {
+func NewRegistry(clusters Clusters, bus domain.Publisher, store domain.ForwardStore) *Registry {
 	return &Registry{
 		clusters: clusters,
 		bus:      bus,
+		store:    store,
 		dial:     dialSPDY,
 		forwards: make(map[string]*forward),
 	}
@@ -84,8 +88,12 @@ func (r *Registry) Start(
 		return domain.PortForward{}, err
 	}
 
+	spec := domain.ForwardSpec{Ref: ref, LocalPort: localPort, RemotePort: remotePort}
+	spec.Ref.UID = "" // a uid does not survive the pod it names, and nothing here reads it
+
 	entry := &forward{
 		stop: make(chan struct{}),
+		spec: spec,
 		meta: domain.PortForward{
 			ClusterID:  ref.ClusterID,
 			Namespace:  ref.Namespace,
@@ -112,11 +120,34 @@ func (r *Registry) Start(
 	meta := entry.meta
 	r.mu.Unlock()
 
+	r.remember(spec)
+
 	go r.serve(meta.ID, entry, pipe)
 	go r.activate(meta.ID, entry, pipe, ready)
-	go r.untilDisconnected(meta.ID, entry.stop, conn.Context())
+	go r.untilDisconnected(meta.ID, entry, conn.Context())
 
 	return meta, nil
+}
+
+// Restore starts every forward remembered for a cluster that is not already up.
+// It runs when a cluster connects, so a forward survives a restart of Nens.
+func (r *Registry) Restore(ctx context.Context, clusterID string) ([]domain.PortForward, error) {
+	started := make([]domain.PortForward, 0)
+	var failures []error
+
+	for _, spec := range r.store.Forwards() {
+		if spec.Ref.ClusterID != clusterID || r.live(spec) {
+			continue
+		}
+
+		meta, err := r.Start(ctx, spec.Ref, spec.LocalPort, spec.RemotePort)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s/%s: %w", spec.Ref.Namespace, spec.Ref.Name, err))
+			continue
+		}
+		started = append(started, meta)
+	}
+	return started, errors.Join(failures...)
 }
 
 func (r *Registry) List() []domain.PortForward {
@@ -131,6 +162,8 @@ func (r *Registry) List() []domain.PortForward {
 	return out
 }
 
+// Stop is the only path that forgets a forward: one that dies with its cluster or
+// with the app is meant to come back on the next connect.
 func (r *Registry) Stop(id string) error {
 	r.mu.Lock()
 	entry := r.forwards[id]
@@ -139,8 +172,30 @@ func (r *Registry) Stop(id string) error {
 	if entry == nil {
 		return nil
 	}
+	r.forget(entry.spec)
 	r.finish(id, entry, nil)
 	return nil
+}
+
+func (r *Registry) live(spec domain.ForwardSpec) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, entry := range r.forwards {
+		if entry.spec.SameTunnel(spec) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Registry) remember(spec domain.ForwardSpec) {
+	kept := slices.DeleteFunc(r.store.Forwards(), spec.SameTunnel)
+	_ = r.store.SetForwards(append(kept, spec))
+}
+
+func (r *Registry) forget(spec domain.ForwardSpec) {
+	_ = r.store.SetForwards(slices.DeleteFunc(r.store.Forwards(), spec.SameTunnel))
 }
 
 func (r *Registry) serve(id string, entry *forward, pipe tunnel) {
@@ -168,17 +223,21 @@ func (r *Registry) activate(id string, entry *forward, pipe tunnel, ready chan s
 	}
 	entry.meta.LocalPort = int(ports[0].Local)
 	entry.meta.Status = domain.ForwardActive
-	meta := entry.meta
+	entry.spec.LocalPort = entry.meta.LocalPort
+	meta, spec := entry.meta, entry.spec
 	r.mu.Unlock()
 
+	// Remember the port the kernel picked, not the 0 that was asked for, so a
+	// restored forward answers on the address the user copied.
+	r.remember(spec)
 	r.bus.Publish(event.TopicForwardChanged, meta)
 }
 
-func (r *Registry) untilDisconnected(id string, stop <-chan struct{}, connection context.Context) {
+func (r *Registry) untilDisconnected(id string, entry *forward, connection context.Context) {
 	select {
 	case <-connection.Done():
-		_ = r.Stop(id)
-	case <-stop:
+		r.finish(id, entry, nil)
+	case <-entry.stop:
 	}
 }
 

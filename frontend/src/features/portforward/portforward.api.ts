@@ -1,4 +1,4 @@
-import { List, Ports, Start, Stop } from '@bindings/go/app/PortForwardAPI'
+import { List, Ports, Restore, Start, Stop } from '@bindings/go/app/PortForwardAPI'
 import type { domain } from '@bindings/go/models'
 import { useClusters } from '@/features/clusters/cluster.store'
 import type { ResourceRef } from '@/features/resources/resource.types'
@@ -42,6 +42,12 @@ export async function startForward(
     return forward
   }
   return (await Start(ref as domain.ResourceRef, localPort, remotePort)) as PortForward
+}
+
+/** Offline there is nothing persisted to bring back. */
+export async function restoreForwards(clusterId: string): Promise<PortForward[]> {
+  if (offline()) return []
+  return (await Restore(clusterId)) as PortForward[]
 }
 
 export async function stopForward(id: string): Promise<void> {

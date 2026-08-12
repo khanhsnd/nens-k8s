@@ -22,7 +22,7 @@ function Section({ section, forceOpen }: { section: NavSection; forceOpen: boole
           className={cn('size-3.5 shrink-0 text-faint transition-transform', open && 'rotate-90')}
         />
         <Icon className="size-4 shrink-0" />
-        <span className="flex-1 truncate text-[12.5px]">{section.label}</span>
+        <span className="flex-1 truncate text-sm">{section.label}</span>
       </button>
 
       {open && (
@@ -34,7 +34,7 @@ function Section({ section, forceOpen }: { section: NavSection; forceOpen: boole
                 key={leaf.id}
                 onClick={() => openTab(section.id, leaf.id)}
                 className={cn(
-                  'block w-full truncate rounded-md py-[5px] pl-7 pr-2 text-left text-[12.5px] transition-colors',
+                  'block w-full truncate rounded-md py-[5px] pl-7 pr-2 text-left text-sm transition-colors',
                   selected
                     ? 'bg-accent-dim font-medium text-accent'
                     : 'text-muted hover:bg-raised hover:text-text',
@@ -61,7 +61,7 @@ export function NavTree({ query }: { query: string }) {
     : NAV_SECTIONS
 
   if (sections.length === 0) {
-    return <div className="py-3 pl-7 text-[12px] text-faint">No resource matches</div>
+    return <div className="py-3 pl-7 text-sm text-faint">No resource matches</div>
   }
 
   return (

@@ -22,24 +22,24 @@ export function ObjectEvents({ target }: { target: ResourceRef }) {
     }
   }, [target])
 
-  if (error) return <div className="p-4 text-[12px] text-danger">{error}</div>
-  if (!records) return <div className="p-4 text-[12px] text-faint">Loading events…</div>
-  if (records.length === 0) return <div className="p-4 text-[12px] text-faint">No events</div>
+  if (error) return <div className="p-4 text-sm text-danger">{error}</div>
+  if (!records) return <div className="p-4 text-sm text-faint">Loading events…</div>
+  if (records.length === 0) return <div className="p-4 text-sm text-faint">No events</div>
 
   return (
     <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto">
       {records.map((record, index) => (
         <li key={`${record.reason}-${record.last}-${index}`} className="space-y-1 px-4 py-2.5">
-          <div className="flex items-center gap-1.5 text-[12px]">
+          <div className="flex items-center gap-1.5 text-sm">
             <Dot tone={record.type === 'Warning' ? 'warn' : 'ok'} />
             <span className="font-medium">{record.reason}</span>
             {record.count > 1 && <span className="text-faint">×{record.count}</span>}
-            <span className="ml-auto shrink-0 text-[11px] text-faint">
+            <span className="ml-auto shrink-0 text-xs text-faint">
               {record.last ? age(record.last) : '—'}
             </span>
           </div>
-          <p className="text-[11.5px] leading-relaxed text-muted">{record.message}</p>
-          <div className="text-[11px] text-faint">{record.source}</div>
+          <p className="text-xs leading-relaxed text-muted">{record.message}</p>
+          <div className="text-xs text-faint">{record.source}</div>
         </li>
       ))}
     </ul>

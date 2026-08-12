@@ -40,7 +40,7 @@ export function TabBar() {
             }}
             onDoubleClick={() => closeOthers(tab.id)}
             className={cn(
-              'group flex min-w-[112px] max-w-[220px] shrink-0 cursor-pointer items-center gap-2 border-r border-line px-3 text-[12.5px]',
+              'group flex min-w-[112px] max-w-[220px] shrink-0 cursor-pointer items-center gap-2 border-r border-line px-3 text-sm',
               active
                 ? 'border-t-2 border-t-accent bg-surface font-medium text-text'
                 : 'border-t-2 border-t-transparent text-muted hover:bg-raised hover:text-text',

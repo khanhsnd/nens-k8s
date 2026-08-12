@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { listContainers } from '@/features/containers/container.api'
 import { targetKey, type ContainerTarget } from '@/features/containers/container.types'
 import type { ResourceRef } from '@/features/resources/resource.types'
+import { useAppearance } from '@/features/settings/appearance.store'
 import { useTheme } from '@/features/theme/theme.store'
 import { copyText } from '@/shared/lib/clipboard'
 import { SHELLS } from './exec.types'
@@ -65,7 +66,7 @@ function Choice({
       value={value}
       title={title}
       onChange={(event) => onChange(event.target.value)}
-      className="max-w-56 rounded border border-line bg-base px-1.5 py-1 text-[11px] text-muted outline-none transition-colors hover:text-text focus:border-accent/60"
+      className="max-w-56 rounded border border-line bg-base px-1.5 py-1 text-xs text-muted outline-none transition-colors hover:text-text focus:border-accent/60"
     >
       {options.map(([option, label]) => (
         <option key={option} value={option}>
@@ -100,6 +101,8 @@ export function TerminalPanel({ target, node }: { target: ResourceRef; node?: st
   const id = `shell:${target.uid}`
   const session = useShells((state) => state.sessions[id])
   const theme = useTheme((state) => state.theme)
+  const fontSize = useAppearance((state) => state.size)
+  const monoFont = useAppearance((state) => state.mono)
 
   const [targets, setTargets] = useState<ContainerTarget[] | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
@@ -109,18 +112,20 @@ export function TerminalPanel({ target, node }: { target: ResourceRef; node?: st
 
   const host = useRef<HTMLDivElement>(null)
   const term = useRef<Terminal | null>(null)
+  const fitter = useRef<FitAddon | null>(null)
 
   useEffect(() => {
     const terminal = new Terminal({
       allowProposedApi: true,
       cursorBlink: true,
       fontFamily: token('--font-mono') || 'monospace',
-      fontSize: 12,
+      fontSize: useAppearance.getState().size,
       lineHeight: 1.2,
       scrollback: SCROLLBACK,
       theme: terminalTheme(),
     })
     const fit = new FitAddon()
+    fitter.current = fit
     terminal.loadAddon(fit)
     terminal.open(host.current!)
     terminal.onData((data) => sendInput(id, data))
@@ -145,6 +150,17 @@ export function TerminalPanel({ target, node }: { target: ResourceRef; node?: st
   useEffect(() => {
     if (term.current) term.current.options.theme = terminalTheme()
   }, [theme])
+
+  // xterm paints its own cells, so the appearance settings have to be handed to it.
+  useEffect(() => {
+    const terminal = term.current
+    if (!terminal) return
+
+    terminal.options.fontFamily = token('--font-mono') || 'monospace'
+    terminal.options.fontSize = fontSize
+    fitter.current?.fit()
+    resizeShell(id, terminal.cols, terminal.rows)
+  }, [id, fontSize, monoFont])
 
   useEffect(() => () => closeShell(id), [id])
 
@@ -203,7 +219,7 @@ export function TerminalPanel({ target, node }: { target: ResourceRef; node?: st
     <div className="flex min-h-0 flex-1 flex-col bg-base">
       <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 py-1.5">
         {node ? (
-          <span className="font-mono text-[11px] text-muted">node/{node}</span>
+          <span className="font-mono text-xs text-muted">node/{node}</span>
         ) : (
           <Choice
             value={container}
@@ -230,14 +246,14 @@ export function TerminalPanel({ target, node }: { target: ResourceRef; node?: st
       </div>
 
       {failed && (
-        <div className="shrink-0 border-b border-line bg-raised px-3 py-1.5 font-mono text-[11px] text-danger">
+        <div className="shrink-0 border-b border-line bg-raised px-3 py-1.5 font-mono text-xs text-danger">
           {failed}
         </div>
       )}
 
       <div ref={host} className="min-h-0 flex-1 overflow-hidden px-2 py-1" />
 
-      <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-3 py-1 text-[11px] text-faint">
+      <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-3 py-1 text-xs text-faint">
         <span className="truncate font-mono">
           {node ? `nsenter on ${node}` : (chosen ? `${chosen.pod}/${chosen.container}` : '—')}
         </span>

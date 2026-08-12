@@ -26,7 +26,8 @@ export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: R
 /**
  * A bordered chip. Its height is fixed and its leading reset because a grid cell
  * sets `line-height` to the row height — inheriting that makes the border taller
- * than the row it sits in.
+ * than the row it sits in. The height is in `em` so it tracks the text size the
+ * appearance settings chose instead of clipping the label.
  */
 export function Pill({
   tone = 'neutral',
@@ -43,7 +44,7 @@ export function Pill({
     <span
       title={title}
       className={cn(
-        'inline-flex h-[17px] max-w-full items-center gap-1 truncate rounded-full border px-1.5 align-middle text-[10.5px] leading-none',
+        'inline-flex h-[1.7em] max-w-full items-center gap-1 truncate rounded-full border px-1.5 align-middle text-2xs leading-none',
         mono ? 'font-mono' : 'uppercase tracking-wide',
         PILLS[tone],
       )}

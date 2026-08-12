@@ -10,6 +10,10 @@ export function Ports(arg1) {
   return window['go']['app']['PortForwardAPI']['Ports'](arg1);
 }
 
+export function Restore(arg1) {
+  return window['go']['app']['PortForwardAPI']['Restore'](arg1);
+}
+
 export function Start(arg1, arg2, arg3) {
   return window['go']['app']['PortForwardAPI']['Start'](arg1, arg2, arg3);
 }

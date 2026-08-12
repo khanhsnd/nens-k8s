@@ -40,7 +40,7 @@ export function DetailDrawer({
       <Resizer edge="left" onResize={setWidth} />
 
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-4">
-        <span className="mr-auto truncate text-[13px] font-semibold">{object.metadata.name}</span>
+        <span className="mr-auto truncate text-md font-semibold">{object.metadata.name}</span>
 
         <ObjectActions target={target} object={object} kind={kind} onDeleted={onClose} />
 
@@ -60,7 +60,7 @@ export function DetailDrawer({
             key={item}
             onClick={() => guard(() => setTab(item))}
             className={cn(
-              'relative px-2.5 py-2 text-[12px] transition-colors',
+              'relative px-2.5 py-2 text-sm transition-colors',
               tab === item ? 'text-accent' : 'text-muted hover:text-text',
             )}
           >

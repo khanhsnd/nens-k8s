@@ -27,6 +27,18 @@ type SettingsStore interface {
 	SetClusterName(id string, name string) error
 }
 
+// ForwardStore is the slice of the settings a port forward needs. It is its own
+// port so the forward registry does not depend on every other setting — and so
+// the kubeconfig loader does not depend on forwards.
+type ForwardStore interface {
+	Forwards() []ForwardSpec
+	SetForwards(specs []ForwardSpec) error
+}
+
+type FontSource interface {
+	Families() ([]string, error)
+}
+
 type ClusterRegistry interface {
 	List() ([]Cluster, error)
 	Get(id string) (Cluster, bool)
@@ -70,6 +82,7 @@ type ExecRunner interface {
 type PortForwarder interface {
 	Ports(ctx context.Context, ref ResourceRef) ([]ForwardPort, error)
 	Start(ctx context.Context, ref ResourceRef, localPort int, remotePort int) (PortForward, error)
+	Restore(ctx context.Context, clusterID string) ([]PortForward, error)
 	List() []PortForward
 	Stop(id string) error
 }

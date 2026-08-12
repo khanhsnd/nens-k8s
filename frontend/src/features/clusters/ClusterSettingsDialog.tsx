@@ -38,20 +38,20 @@ export function ClusterSettingsDialog({
     <Dialog title="Cluster settings" onClose={onClose}>
       <div className="space-y-3 p-4">
         <label className="block space-y-1.5">
-          <span className="text-[10px] uppercase tracking-wide text-faint">Display name</span>
+          <span className="text-2xs uppercase tracking-wide text-faint">Display name</span>
           <input
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => event.key === 'Enter' && changed && void save()}
-            className="w-full rounded-md border border-line bg-base px-2.5 py-1.5 text-[12px] text-text outline-none focus:border-accent/60"
+            className="w-full rounded-md border border-line bg-base px-2.5 py-1.5 text-sm text-text outline-none focus:border-accent/60"
           />
         </label>
-        <p className="text-[11.5px] text-faint">
+        <p className="text-xs text-faint">
           Only the label shown in Nens — the kubeconfig context stays {cluster.context}.
         </p>
 
-        <dl className="border-t border-line pt-2 text-[12px]">
+        <dl className="border-t border-line pt-2 text-sm">
           {DETAILS.map((detail) => {
             const value = detail.value(cluster)
             return (
@@ -75,19 +75,19 @@ export function ClusterSettingsDialog({
           })}
         </dl>
 
-        {error && <p className="text-[11.5px] text-danger">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[12px] text-muted transition-colors hover:bg-raised hover:text-text"
+            className="rounded-md px-3 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
           >
             Cancel
           </button>
           <button
             onClick={() => void save()}
             disabled={!changed}
-            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-base transition-opacity disabled:opacity-40"
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-base transition-opacity disabled:opacity-40"
           >
             Save
           </button>

@@ -6,6 +6,7 @@ import (
 	"nens-k8s/internal/config"
 	"nens-k8s/internal/domain"
 	"nens-k8s/internal/event"
+	"nens-k8s/internal/fonts"
 	"nens-k8s/internal/kube/cluster"
 	"nens-k8s/internal/kube/exec"
 	"nens-k8s/internal/kube/forward"
@@ -25,13 +26,15 @@ type App struct {
 	logs        *LogAPI
 	shells      *ExecAPI
 	forwards    *PortForwardAPI
+	settings    *SettingsAPI
 
 	ctx context.Context
 }
 
 func New() *App {
 	bus := event.NewBus()
-	loader := kubeconfig.NewLoader(config.NewStore())
+	store := config.NewStore()
+	loader := kubeconfig.NewLoader(store)
 	registry := cluster.NewRegistry(loader, bus)
 	return &App{
 		bus:         bus,
@@ -42,7 +45,8 @@ func New() *App {
 		containers:  NewContainerAPI(pods.NewResolver(registry)),
 		logs:        NewLogAPI(logs.NewStreamer(registry, bus)),
 		shells:      NewExecAPI(exec.NewRunner(registry, bus)),
-		forwards:    NewPortForwardAPI(forward.NewRegistry(registry, bus)),
+		forwards:    NewPortForwardAPI(forward.NewRegistry(registry, bus, store)),
+		settings:    NewSettingsAPI(store, fonts.NewSource()),
 	}
 }
 
@@ -56,6 +60,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.logs.bind(ctx)
 	a.shells.bind(ctx)
 	a.forwards.bind(ctx)
+	a.settings.bind(ctx)
 }
 
 func (a *App) Shutdown(_ context.Context) {
@@ -71,5 +76,6 @@ func (a *App) Bindings() []any {
 		a.logs,
 		a.shells,
 		a.forwards,
+		a.settings,
 	}
 }

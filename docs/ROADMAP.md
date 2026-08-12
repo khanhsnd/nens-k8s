@@ -98,7 +98,8 @@ composites, so `requestAnimationFrame` never fires) — the data path was verifi
 
 ## Phase 9 — Production hardening
 
-- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list and per-cluster display names. Extend it, don't replace it.
+- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list, per-cluster display names and the port forwards to restore on connect. UI preferences (theme, appearance, panel sizes, grid layouts, namespace filter, open tabs, last cluster) live in `localStorage` through `shared/lib/persist.ts` — see `DECISIONS.md` for which side owns what.
+- Appearance is done: `SettingsAPI` (`Fonts`/`Dir`/`Reveal`) plus `features/settings` — installed-font picker for the UI and monospace families, and a text size that scales the whole type scale off one CSS variable.
 - Structured logging with `log/slog`, log file in the same dir.
 - Table tests for the registry, informer ref-counting, and the coalescer.
 - NSIS installer, code signing, auto-update feed.

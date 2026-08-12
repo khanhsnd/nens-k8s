@@ -58,22 +58,22 @@ function DeleteDialog({
   return (
     <Dialog title={`Delete ${target.name}?`} onClose={onClose}>
       <div className="space-y-4 p-4">
-        <p className="text-[12px] text-muted">
+        <p className="text-sm text-muted">
           {target.namespace ? `${target.gvr.resource} in ${target.namespace}` : target.gvr.resource}{' '}
           — this cannot be undone.
         </p>
-        {error && <p className="font-mono text-[11px] text-danger">{error}</p>}
+        {error && <p className="font-mono text-xs text-danger">{error}</p>}
 
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[12px] text-muted transition-colors hover:bg-raised hover:text-text"
+            className="rounded-md px-3 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
           >
             Cancel
           </button>
           <button
             onClick={() => void remove()}
-            className="rounded-md bg-danger px-3 py-1.5 text-[12px] font-medium text-base"
+            className="rounded-md bg-danger px-3 py-1.5 text-sm font-medium text-base"
           >
             Delete
           </button>
@@ -111,7 +111,7 @@ function ScaleDialog({
     <Dialog title={`Scale ${target.name}`} onClose={onClose}>
       <div className="space-y-3 p-4">
         <label className="block space-y-1.5">
-          <span className="text-[10px] uppercase tracking-wide text-faint">Replicas</span>
+          <span className="text-2xs uppercase tracking-wide text-faint">Replicas</span>
           <input
             autoFocus
             type="number"
@@ -119,23 +119,23 @@ function ScaleDialog({
             value={replicas}
             onChange={(event) => setReplicas(event.target.value)}
             onKeyDown={(event) => event.key === 'Enter' && valid && void save()}
-            className="w-full rounded-md border border-line bg-base px-2.5 py-1.5 text-[12px] text-text outline-none focus:border-accent/60"
+            className="w-full rounded-md border border-line bg-base px-2.5 py-1.5 text-sm text-text outline-none focus:border-accent/60"
           />
         </label>
-        <p className="text-[11.5px] text-faint">Currently {current}.</p>
-        {error && <p className="font-mono text-[11px] text-danger">{error}</p>}
+        <p className="text-xs text-faint">Currently {current}.</p>
+        {error && <p className="font-mono text-xs text-danger">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[12px] text-muted transition-colors hover:bg-raised hover:text-text"
+            className="rounded-md px-3 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
           >
             Cancel
           </button>
           <button
             onClick={() => void save()}
             disabled={!valid}
-            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-base transition-opacity disabled:opacity-40"
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-base transition-opacity disabled:opacity-40"
           >
             Scale
           </button>

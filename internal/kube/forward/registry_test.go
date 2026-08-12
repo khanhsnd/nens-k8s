@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,6 +40,28 @@ func (r *recorder) next(t *testing.T) domain.PortForward {
 		t.Fatal("timed out waiting for a forward event")
 		return domain.PortForward{}
 	}
+}
+
+// specs stands in for the settings file. It locks because `remember` runs on the
+// goroutine that waits for the local port.
+type specs struct {
+	mu    sync.Mutex
+	saved []domain.ForwardSpec
+}
+
+func (s *specs) Forwards() []domain.ForwardSpec {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return slices.Clone(s.saved)
+}
+
+func (s *specs) SetForwards(next []domain.ForwardSpec) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.saved = next
+	return nil
 }
 
 type clusters struct {
@@ -119,7 +143,7 @@ func newRegistry(t *testing.T, fail error, objects ...runtime.Object) (*Registry
 	conn := cluster.NewConnection(ctx, domain.Cluster{ID: "test"}, cluster.Clients{Dynamic: dyn})
 	bus := &recorder{forwards: make(chan domain.PortForward, 32)}
 
-	registry := NewRegistry(clusters{conn: conn}, bus)
+	registry := NewRegistry(clusters{conn: conn}, bus, &specs{})
 	registry.dial = func(
 		_ *cluster.Connection,
 		_ string,
@@ -164,6 +188,91 @@ func TestStartReportsTheLocalPortTheKernelPicked(t *testing.T) {
 	}
 }
 
+func saved(t *testing.T, registry *Registry) []domain.ForwardSpec {
+	t.Helper()
+
+	store, ok := registry.store.(*specs)
+	if !ok {
+		t.Fatalf("store = %T, want *specs", registry.store)
+	}
+	return store.Forwards()
+}
+
+func TestAStartedForwardIsRememberedWithThePortTheKernelPicked(t *testing.T) {
+	registry, bus, _ := newRegistry(t, nil, podObject("api-1", "Running"))
+
+	if _, err := registry.Start(context.Background(), ref("pods", "api-1"), 0, 8080); err != nil {
+		t.Fatal(err)
+	}
+	bus.next(t)
+
+	remembered := saved(t, registry)
+	if len(remembered) != 1 {
+		t.Fatalf("remembered = %+v, want one spec", remembered)
+	}
+	if remembered[0].LocalPort != 34567 || remembered[0].RemotePort != 8080 {
+		t.Errorf("remembered ports = %+v, want 34567:8080", remembered[0])
+	}
+	if remembered[0].Ref.UID != "" {
+		t.Errorf("remembered uid = %q, want it dropped", remembered[0].Ref.UID)
+	}
+}
+
+func TestAForwardThatDiesWithItsClusterStaysRemembered(t *testing.T) {
+	registry, bus, disconnect := newRegistry(t, nil, podObject("api-1", "Running"))
+
+	if _, err := registry.Start(context.Background(), ref("pods", "api-1"), 8080, 8080); err != nil {
+		t.Fatal(err)
+	}
+	bus.next(t)
+
+	disconnect()
+	bus.next(t)
+
+	if remembered := saved(t, registry); len(remembered) != 1 {
+		t.Errorf("remembered = %+v, want it kept for the next connect", remembered)
+	}
+}
+
+func TestRestoreStartsEachRememberedForwardOnce(t *testing.T) {
+	registry, bus, _ := newRegistry(t, nil, podObject("api-1", "Running"))
+	_ = registry.store.SetForwards([]domain.ForwardSpec{
+		{Ref: ref("pods", "api-1"), LocalPort: 34567, RemotePort: 8080},
+		{Ref: ref("pods", "api-1"), LocalPort: 0, RemotePort: 9090},
+	})
+
+	restored, err := registry.Restore(context.Background(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(restored) != 2 {
+		t.Fatalf("restored = %+v, want both", restored)
+	}
+	bus.next(t)
+	bus.next(t)
+
+	again, err := registry.Restore(context.Background(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again) != 0 {
+		t.Errorf("a second restore started %+v, want nothing — they are already up", again)
+	}
+}
+
+func TestRestoreSkipsOtherClusters(t *testing.T) {
+	registry, _, _ := newRegistry(t, nil, podObject("api-1", "Running"))
+
+	elsewhere := ref("pods", "api-1")
+	elsewhere.ClusterID = "other"
+	_ = registry.store.SetForwards([]domain.ForwardSpec{{Ref: elsewhere, RemotePort: 8080}})
+
+	restored, err := registry.Restore(context.Background(), "test")
+	if err != nil || len(restored) != 0 {
+		t.Errorf("restored = %+v, err = %v, want nothing", restored, err)
+	}
+}
+
 func TestStopEndsTheForwardAndForgetsIt(t *testing.T) {
 	registry, bus, _ := newRegistry(t, nil, podObject("api-1", "Running"))
 
@@ -181,6 +290,9 @@ func TestStopEndsTheForwardAndForgetsIt(t *testing.T) {
 	}
 	if listed := registry.List(); len(listed) != 0 {
 		t.Errorf("List() = %+v, want empty", listed)
+	}
+	if remembered := saved(t, registry); len(remembered) != 0 {
+		t.Errorf("remembered = %+v, want it forgotten", remembered)
 	}
 }
 

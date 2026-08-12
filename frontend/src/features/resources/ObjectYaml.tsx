@@ -65,7 +65,7 @@ export function ObjectYaml({ target }: { target: ResourceRef }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-2 text-[11.5px]">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-2 text-xs">
         <span className={dirty ? 'text-warn' : 'text-faint'}>
           {dirty ? 'unsaved changes' : 'in sync with the cluster'}
         </span>
@@ -91,7 +91,7 @@ export function ObjectYaml({ target }: { target: ResourceRef }) {
       </div>
 
       {error && (
-        <div className="shrink-0 border-b border-line bg-raised px-3 py-2 font-mono text-[11px] text-danger">
+        <div className="shrink-0 border-b border-line bg-raised px-3 py-2 font-mono text-xs text-danger">
           {error}
         </div>
       )}

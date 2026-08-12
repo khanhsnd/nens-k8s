@@ -6,6 +6,8 @@ export function List():Promise<Array<domain.PortForward>>;
 
 export function Ports(arg1:domain.ResourceRef):Promise<Array<domain.ForwardPort>>;
 
+export function Restore(arg1:string):Promise<Array<domain.PortForward>>;
+
 export function Start(arg1:domain.ResourceRef,arg2:number,arg3:number):Promise<domain.PortForward>;
 
 export function Stop(arg1:string):Promise<void>;

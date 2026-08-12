@@ -1,5 +1,6 @@
-import { FolderOpen, Trash2 } from 'lucide-react'
+import { FolderOpen, FolderSearch, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { configDir, revealPath } from '@/features/settings/settings.api'
 import { cn } from '@/shared/lib/cn'
 import { Dialog } from '@/shared/ui/Dialog'
 import { useClusters } from './cluster.store'
@@ -26,9 +27,12 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
   const [mode, setMode] = useState<Mode>('file')
   const [path, setPath] = useState('')
   const [content, setContent] = useState('')
+  const [dir, setDir] = useState('')
 
   useEffect(() => {
-    if (open) void load()
+    if (!open) return
+    void load()
+    void configDir().then(setDir)
   }, [open, load])
 
   if (!open) return null
@@ -57,7 +61,7 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
               key={item.id}
               onClick={() => setMode(item.id)}
               className={cn(
-                'flex-1 rounded px-2 py-1 text-[12px] transition-colors',
+                'flex-1 rounded px-2 py-1 text-sm transition-colors',
                 mode === item.id ? 'bg-overlay text-text' : 'text-muted hover:text-text',
               )}
             >
@@ -72,11 +76,11 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
               value={path}
               onChange={(event) => setPath(event.target.value)}
               placeholder="C:\Users\you\.kube\config"
-              className="flex-1 rounded-md border border-line bg-base px-2.5 py-1.5 font-mono text-[12px] text-text outline-none placeholder:text-faint focus:border-accent/60"
+              className="flex-1 rounded-md border border-line bg-base px-2.5 py-1.5 font-mono text-sm text-text outline-none placeholder:text-faint focus:border-accent/60"
             />
             <button
               onClick={() => void browse()}
-              className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-[12px] text-muted transition-colors hover:bg-raised hover:text-text"
+              className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
             >
               <FolderOpen className="size-3.5" />
               Browse
@@ -88,13 +92,31 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
             onChange={(event) => setContent(event.target.value)}
             spellCheck={false}
             placeholder={'apiVersion: v1\nkind: Config\nclusters:\n  - name: ...'}
-            className="h-52 w-full resize-none rounded-md border border-line bg-base px-2.5 py-2 font-mono text-[11.5px] leading-relaxed text-text outline-none placeholder:text-faint focus:border-accent/60"
+            className="h-52 w-full resize-none rounded-md border border-line bg-base px-2.5 py-2 font-mono text-xs leading-relaxed text-text outline-none placeholder:text-faint focus:border-accent/60"
           />
         )}
 
-        {error && <p className="text-[11.5px] text-danger">{error}</p>}
+        {mode === 'paste' && (
+          <p className="flex items-center gap-1.5 text-xs text-faint">
+            <span className="min-w-0 truncate">
+              Written to a file in the <span className="font-mono">kubeconfigs</span> folder under{' '}
+              <span className="font-mono">{dir || 'the Nens config directory'}</span>
+            </span>
+            {dir && (
+              <button
+                onClick={() => void revealPath(dir)}
+                title="Open that folder"
+                className="grid size-5 shrink-0 place-items-center rounded text-faint transition-colors hover:bg-raised hover:text-text"
+              >
+                <FolderSearch className="size-3.5" />
+              </button>
+            )}
+          </p>
+        )}
+
+        {error && <p className="text-xs text-danger">{error}</p>}
         {offline && !error && (
-          <p className="text-[11.5px] text-warn">
+          <p className="text-xs text-warn">
             Managing kubeconfigs needs the desktop app — the browser preview has no bridge.
           </p>
         )}
@@ -102,14 +124,14 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[12px] text-muted transition-colors hover:bg-raised hover:text-text"
+            className="rounded-md px-3 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
           >
             Cancel
           </button>
           <button
             onClick={() => void submit()}
             disabled={!ready || busy}
-            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-base transition-opacity disabled:opacity-40"
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-base transition-opacity disabled:opacity-40"
           >
             {busy ? 'Adding…' : 'Add'}
           </button>
@@ -118,16 +140,23 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
 
       {files.length > 0 && (
         <div className="border-t border-line px-4 py-3">
-          <div className="pb-1.5 text-[10px] uppercase tracking-wide text-faint">Sources</div>
+          <div className="pb-1.5 text-2xs uppercase tracking-wide text-faint">Sources</div>
           <ul className="space-y-0.5">
             {files.map((file) => (
-              <li key={file.path} className="flex items-center gap-2 text-[11.5px]">
+              <li key={file.path} className="flex items-center gap-2 text-xs">
                 <span className="truncate font-mono text-muted" title={file.path}>
                   {file.path}
                 </span>
                 <span className={cn('ml-auto shrink-0', file.error ? 'text-danger' : 'text-faint')}>
                   {file.error ? 'unreadable' : `${file.contexts} contexts`}
                 </span>
+                <button
+                  onClick={() => void revealPath(file.path)}
+                  title="Show this file in the file manager"
+                  className="grid size-6 shrink-0 place-items-center rounded text-faint transition-colors hover:bg-raised hover:text-text"
+                >
+                  <FolderSearch className="size-3.5" />
+                </button>
                 {file.removable && (
                   <button
                     onClick={() => void remove(file.path)}

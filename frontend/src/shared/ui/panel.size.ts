@@ -1,28 +1,21 @@
 import { useCallback } from 'react'
 import { create } from 'zustand'
+import { load, save } from '@/shared/lib/persist'
 
-const STORAGE_KEY = 'nens:panels'
+const KEY = 'panels'
 
 type PanelState = {
   sizes: Record<string, number>
   resize: (id: string, size: number) => void
 }
 
-function load(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-  } catch {
-    return {}
-  }
-}
-
 const usePanels = create<PanelState>((set) => ({
-  sizes: load(),
+  sizes: load<Record<string, number>>(KEY, {}),
 
   resize: (id, size) =>
     set((state) => {
       const sizes = { ...state.sizes, [id]: size }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sizes))
+      save(KEY, sizes)
       return { sizes }
     }),
 }))

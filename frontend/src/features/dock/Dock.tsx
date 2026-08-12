@@ -27,13 +27,13 @@ function Tab({
     <div
       onPointerDown={onActivate}
       className={cn(
-        'flex h-7 max-w-56 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors',
+        'flex h-7 max-w-56 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm transition-colors',
         active ? 'bg-raised text-text' : 'text-muted hover:bg-raised/60 hover:text-text',
       )}
     >
       <Icon className="size-3.5 shrink-0 text-faint" />
       <span className="truncate">{tool.title}</span>
-      {tool.subtitle && <span className="shrink-0 truncate text-[11px] text-faint">{tool.subtitle}</span>}
+      {tool.subtitle && <span className="shrink-0 truncate text-xs text-faint">{tool.subtitle}</span>}
 
       <button
         onClick={(event) => {

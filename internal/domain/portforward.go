@@ -25,3 +25,18 @@ type PortForward struct {
 	Status     string `json:"status"`
 	Error      string `json:"error,omitempty"`
 }
+
+// ForwardSpec is what a forward needs to be started again after a restart.
+type ForwardSpec struct {
+	Ref        ResourceRef `json:"ref"`
+	LocalPort  int         `json:"localPort"`
+	RemotePort int         `json:"remotePort"`
+}
+
+func (s ForwardSpec) SameTunnel(other ForwardSpec) bool {
+	return s.Ref.ClusterID == other.Ref.ClusterID &&
+		s.Ref.GVR == other.Ref.GVR &&
+		s.Ref.Namespace == other.Ref.Namespace &&
+		s.Ref.Name == other.Ref.Name &&
+		s.RemotePort == other.RemotePort
+}

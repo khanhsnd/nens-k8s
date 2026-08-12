@@ -63,7 +63,7 @@ function Choice({
       value={value}
       title={title}
       onChange={(event) => onChange(Number(event.target.value))}
-      className="rounded border border-line bg-base px-1.5 py-1 text-[11px] text-muted outline-none transition-colors hover:text-text focus:border-accent/60"
+      className="rounded border border-line bg-base px-1.5 py-1 text-xs text-muted outline-none transition-colors hover:text-text focus:border-accent/60"
     >
       {options.map(([option, label]) => (
         <option key={option} value={option}>
@@ -210,11 +210,11 @@ export function LogToolbar({
             if (event.key === 'Enter') onStep(event.shiftKey ? -1 : 1)
             if (event.key === 'Escape') onSearch({ query: '' })
           }}
-          className="min-w-0 flex-1 bg-transparent px-1 py-0.5 text-[12px] text-text outline-none placeholder:text-faint"
+          className="min-w-0 flex-1 bg-transparent px-1 py-0.5 text-sm text-text outline-none placeholder:text-faint"
         />
 
         {search.query !== '' && (
-          <span className="shrink-0 tabular-nums text-[11px] text-faint">
+          <span className="shrink-0 tabular-nums text-xs text-faint">
             {matches === 0 ? 'no match' : `${cursor + 1}/${matches}`}
           </span>
         )}

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+
+	"nens-k8s/internal/domain"
 )
 
 const (
@@ -16,8 +18,9 @@ const (
 )
 
 type data struct {
-	Kubeconfigs  []string          `json:"kubeconfigs"`
-	ClusterNames map[string]string `json:"clusterNames"`
+	Kubeconfigs  []string             `json:"kubeconfigs"`
+	ClusterNames map[string]string    `json:"clusterNames"`
+	Forwards     []domain.ForwardSpec `json:"forwards"`
 }
 
 type Store struct {
@@ -88,6 +91,26 @@ func (s *Store) SetClusterName(id string, name string) error {
 
 	if err := s.write(); err != nil {
 		s.data.ClusterNames = previous
+		return err
+	}
+	return nil
+}
+
+func (s *Store) Forwards() []domain.ForwardSpec {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return slices.Clone(s.data.Forwards)
+}
+
+func (s *Store) SetForwards(specs []domain.ForwardSpec) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	previous := s.data.Forwards
+	s.data.Forwards = specs
+	if err := s.write(); err != nil {
+		s.data.Forwards = previous
 		return err
 	}
 	return nil

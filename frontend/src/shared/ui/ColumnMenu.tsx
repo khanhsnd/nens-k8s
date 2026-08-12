@@ -1,6 +1,7 @@
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { Check, MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 import type { Column } from './DataGrid'
+import { MenuCheck } from './MenuCheck'
 
 export function ColumnMenu<T>({
   columns,
@@ -26,7 +27,7 @@ export function ColumnMenu<T>({
         <Menu.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-52 rounded-md border border-line-strong bg-overlay p-1 text-[12px] shadow-xl"
+          className="z-50 min-w-52 rounded-md border border-line-strong bg-overlay p-1 text-sm shadow-xl"
         >
           {columns.map((column) => (
             <Menu.CheckboxItem
@@ -39,11 +40,7 @@ export function ColumnMenu<T>({
               }}
               className="flex cursor-default items-center gap-2 rounded px-2 py-1.5 text-muted outline-none data-[disabled]:text-faint data-[highlighted]:bg-raised data-[highlighted]:text-text"
             >
-              <span className="grid size-3.5 shrink-0 place-items-center rounded-[3px] border border-line-strong">
-                <Menu.ItemIndicator>
-                  <Check className="size-3" />
-                </Menu.ItemIndicator>
-              </span>
+              <MenuCheck />
               {column.label}
             </Menu.CheckboxItem>
           ))}

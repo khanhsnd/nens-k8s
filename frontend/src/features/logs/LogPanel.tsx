@@ -114,10 +114,10 @@ export function LogPanel({ target }: { target: ResourceRef }) {
     if (changes.query) setControls((current) => ({ ...current, follow: false }))
   }, [])
 
-  if (failed) return <div className="p-4 text-[12px] text-danger">{failed}</div>
-  if (!targets) return <div className="p-4 text-[12px] text-faint">Looking for containers…</div>
+  if (failed) return <div className="p-4 text-sm text-danger">{failed}</div>
+  if (!targets) return <div className="p-4 text-sm text-faint">Looking for containers…</div>
   if (targets.length === 0) {
-    return <div className="p-4 text-[12px] text-faint">Nothing here writes logs</div>
+    return <div className="p-4 text-sm text-faint">Nothing here writes logs</div>
   }
 
   // A restart can shrink the match set under the cursor, so clamp instead of tracking it.
@@ -146,7 +146,7 @@ export function LogPanel({ target }: { target: ResourceRef }) {
       />
 
       {session?.error && (
-        <div className="shrink-0 border-b border-line bg-raised px-3 py-1.5 font-mono text-[11px] text-danger">
+        <div className="shrink-0 border-b border-line bg-raised px-3 py-1.5 font-mono text-xs text-danger">
           {session.error}
         </div>
       )}
@@ -161,12 +161,12 @@ export function LogPanel({ target }: { target: ResourceRef }) {
           onLeaveFollow={() => setControls((current) => ({ ...current, follow: false }))}
         />
       ) : (
-        <div className="grid min-h-0 flex-1 place-items-center text-[12px] text-faint">
+        <div className="grid min-h-0 flex-1 place-items-center text-sm text-faint">
           {selection.length === 0 ? 'Pick a container' : 'Connecting…'}
         </div>
       )}
 
-      <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-3 py-1 text-[11px] text-faint">
+      <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-3 py-1 text-xs text-faint">
         <span>{(buffer?.size() ?? 0).toLocaleString()} lines</span>
         {buffer && buffer.total > buffer.size() && (
           <span>of {buffer.total.toLocaleString()} received</span>

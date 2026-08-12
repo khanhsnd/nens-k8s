@@ -27,6 +27,10 @@ func (a *PortForwardAPI) Start(ref domain.ResourceRef, localPort int, remotePort
 	return a.forwards.Start(a.ctx, ref, localPort, remotePort)
 }
 
+func (a *PortForwardAPI) Restore(clusterID string) ([]domain.PortForward, error) {
+	return a.forwards.Restore(a.ctx, clusterID)
+}
+
 func (a *PortForwardAPI) List() []domain.PortForward {
 	return a.forwards.List()
 }

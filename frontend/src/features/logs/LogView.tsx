@@ -1,10 +1,13 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useAppearance } from '@/features/settings/appearance.store'
 import { cn } from '@/shared/lib/cn'
 import type { LogBuffer } from './log.buffer'
 import type { Span } from './log.search'
 import type { LogLine } from './log.types'
 
+// The starting guess only: both come out of the probe below, so the log follows
+// whatever font size the appearance settings chose.
 const LINE_HEIGHT = 19
 const AT_BOTTOM = 40
 
@@ -21,9 +24,15 @@ function tone(text: string): string | undefined {
   return undefined
 }
 
-/** Characters the message column fits, so a wrapped row's height is arithmetic. */
-function useColumns(view: RefObject<HTMLDivElement | null>) {
-  const [columns, setColumns] = useState(120)
+/**
+ * The characters the message column fits and the height of one line, so a wrapped
+ * row's height stays arithmetic. Both are measured rather than assumed: the font
+ * family and size are settings.
+ */
+function useMetrics(view: RefObject<HTMLDivElement | null>) {
+  const size = useAppearance((state) => state.size)
+  const mono = useAppearance((state) => state.mono)
+  const [metrics, setMetrics] = useState({ columns: 120, lineHeight: LINE_HEIGHT })
 
   useEffect(() => {
     const scroller = view.current
@@ -37,11 +46,15 @@ function useColumns(view: RefObject<HTMLDivElement | null>) {
     scroller.appendChild(probe)
 
     const update = () => {
-      const character = probe.getBoundingClientRect().width / 100
+      const box = probe.getBoundingClientRect()
+      const character = box.width / 100
       if (character <= 0) return
 
       const usable = scroller.clientWidth - PADDING_X - GAP - GUTTER * character
-      setColumns(Math.max(20, Math.floor(usable / character)))
+      setMetrics({
+        columns: Math.max(20, Math.floor(usable / character)),
+        lineHeight: box.height,
+      })
     }
 
     update()
@@ -52,9 +65,9 @@ function useColumns(view: RefObject<HTMLDivElement | null>) {
       observer.disconnect()
       probe.remove()
     }
-  }, [view])
+  }, [view, size, mono])
 
-  return columns
+  return metrics
 }
 
 const printed = (line: LogLine) =>
@@ -96,7 +109,7 @@ export function LogView({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const previousTop = useRef(0)
-  const columns = useColumns(scrollRef)
+  const { columns, lineHeight } = useMetrics(scrollRef)
   const count = buffer.size()
 
   // Keyed by the line, not by the row: trimming and filtering both renumber the
@@ -106,10 +119,10 @@ export function LogView({
   const estimateSize = useCallback(
     (index: number) => {
       const line = buffer.at(index)
-      if (!line || !wrap) return LINE_HEIGHT
-      return Math.max(1, Math.ceil(printed(line) / columns)) * LINE_HEIGHT
+      if (!line || !wrap) return lineHeight
+      return Math.max(1, Math.ceil(printed(line) / columns)) * lineHeight
     },
-    [buffer, wrap, columns],
+    [buffer, wrap, columns, lineHeight],
   )
 
   const virtualizer = useVirtualizer({
@@ -122,10 +135,10 @@ export function LogView({
     overscan: 24,
   })
 
-  // A different width invalidates every measured height; nothing else does.
+  // A different width or line height invalidates every measured height.
   useEffect(() => {
     virtualizer.measure()
-  }, [wrap, columns, virtualizer])
+  }, [wrap, columns, lineHeight, virtualizer])
 
   // A full buffer stops growing, so following keys on the version, not the count.
   useEffect(() => {
@@ -140,7 +153,7 @@ export function LogView({
 
   if (count === 0) {
     return (
-      <div className="grid min-h-0 flex-1 place-items-center text-[12px] text-faint">
+      <div className="grid min-h-0 flex-1 place-items-center text-sm text-faint">
         No log lines yet
       </div>
     )
@@ -159,7 +172,7 @@ export function LogView({
         if (follow && upwards && away > AT_BOTTOM) onLeaveFollow()
       }}
       className={cn(
-        'min-h-0 flex-1 select-text overflow-y-scroll font-mono text-[11.5px] leading-[19px] [scrollbar-gutter:stable]',
+        'min-h-0 flex-1 select-text overflow-y-scroll font-mono text-xs leading-[1.65] [scrollbar-gutter:stable]',
         wrap ? 'overflow-x-hidden' : 'overflow-x-auto',
       )}
     >

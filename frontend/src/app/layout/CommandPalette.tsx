@@ -6,7 +6,7 @@ import { useTabs } from '@/features/tabs/tab.store'
 import { Dot, type Tone } from '@/shared/ui/Badge'
 
 const ITEM =
-  'cursor-pointer rounded-md px-2.5 py-1.5 text-[12.5px] normal-case tracking-normal text-muted data-[selected=true]:bg-accent-dim data-[selected=true]:text-accent'
+  'cursor-pointer rounded-md px-2.5 py-1.5 text-sm normal-case tracking-normal text-muted data-[selected=true]:bg-accent-dim data-[selected=true]:text-accent'
 
 const PHASE_TONE: Record<string, Tone> = {
   connected: 'ok',
@@ -42,15 +42,15 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         <Command.Input
           autoFocus
           placeholder="Jump to a resource or switch cluster"
-          className="w-full border-b border-line bg-transparent px-4 py-3 text-[13px] outline-none placeholder:text-faint"
+          className="w-full border-b border-line bg-transparent px-4 py-3 text-md outline-none placeholder:text-faint"
         />
         <Command.List className="max-h-80 overflow-y-auto p-2">
-          <Command.Empty className="px-3 py-6 text-center text-[12px] text-faint">
+          <Command.Empty className="px-3 py-6 text-center text-sm text-faint">
             No matches
           </Command.Empty>
           <Command.Group
             heading="Clusters"
-            className="px-1 pb-1 text-[10px] uppercase tracking-wide text-faint"
+            className="px-1 pb-1 text-2xs uppercase tracking-wide text-faint"
           >
             {clusters.map((cluster) => (
               <Command.Item
@@ -73,7 +73,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             <Command.Group
               key={section.id}
               heading={section.label}
-              className="px-1 pb-1 text-[10px] uppercase tracking-wide text-faint"
+              className="px-1 pb-1 text-2xs uppercase tracking-wide text-faint"
             >
               {section.children.map((leaf) => (
                 <Command.Item

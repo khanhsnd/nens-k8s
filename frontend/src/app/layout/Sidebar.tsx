@@ -19,7 +19,7 @@ export function Sidebar() {
       className="relative flex max-w-[40vw] shrink-0 flex-col border-r border-line bg-surface"
     >
       <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
-        <span className="flex-1 truncate pl-1 text-[10px] font-semibold uppercase tracking-wider text-faint">
+        <span className="flex-1 truncate pl-1 text-2xs font-semibold uppercase tracking-wider text-faint">
           Clusters
         </span>
         <button
@@ -37,7 +37,7 @@ export function Sidebar() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Filter resources"
-          className="w-full rounded-md border border-line bg-base px-2.5 py-1.5 text-[12px] text-text placeholder:text-faint outline-none focus:border-accent/60"
+          className="w-full rounded-md border border-line bg-base px-2.5 py-1.5 text-sm text-text placeholder:text-faint outline-none focus:border-accent/60"
         />
       </div>
 
@@ -48,7 +48,7 @@ export function Sidebar() {
           </ClusterNode>
         ))}
         {clusters.length === 0 && (
-          <p className="px-2 py-6 text-center text-[12px] text-faint">
+          <p className="px-2 py-6 text-center text-sm text-faint">
             No kubeconfig contexts found
           </p>
         )}

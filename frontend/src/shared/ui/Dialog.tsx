@@ -26,7 +26,7 @@ export function Dialog({
         onMouseDown={(event) => event.stopPropagation()}
         className="w-[580px] overflow-hidden rounded-xl border border-line-strong bg-overlay shadow-2xl"
       >
-        <div className="border-b border-line px-4 py-3 text-[13px] font-semibold">{title}</div>
+        <div className="border-b border-line px-4 py-3 text-md font-semibold">{title}</div>
         {children}
       </div>
     </div>

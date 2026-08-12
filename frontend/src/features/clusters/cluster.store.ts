@@ -1,8 +1,14 @@
 import { create } from 'zustand'
 import { Connect, Disconnect, List, Rename } from '@bindings/go/app/ClusterAPI'
 import { EventsOn } from '@bindings/runtime/runtime'
+import { load, save } from '@/shared/lib/persist'
 import type { Cluster } from './cluster.types'
 import { FIXTURE_CLUSTERS } from './cluster.fixtures'
+
+const KEY = 'cluster'
+
+// Read before the store exists, so the first `save` cannot overwrite it.
+const remembered = load<string | null>(KEY, null)
 
 type ClusterState = {
   clusters: Cluster[]
@@ -27,11 +33,19 @@ export const useClusters = create<ClusterState>((set, get) => ({
   offline: false,
 
   load: async () => {
+    // The last cluster is selected again, never connected again: connecting is
+    // the user's call, and the tree shows what they left open either way.
+    const first = (clusters: Cluster[]) =>
+      get().activeId ??
+      clusters.find((c) => c.id === remembered)?.id ??
+      clusters[0]?.id ??
+      null
+
     try {
       const clusters = (await List()) as Cluster[]
-      set({ clusters, offline: false, activeId: get().activeId ?? clusters[0]?.id ?? null })
+      set({ clusters, offline: false, activeId: first(clusters) })
     } catch {
-      set({ clusters: FIXTURE_CLUSTERS, offline: true, activeId: FIXTURE_CLUSTERS[0].id })
+      set({ clusters: FIXTURE_CLUSTERS, offline: true, activeId: first(FIXTURE_CLUSTERS) })
     }
   },
 
@@ -65,6 +79,8 @@ export const useClusters = create<ClusterState>((set, get) => ({
     set(patch(id, { name: next }))
   },
 }))
+
+useClusters.subscribe(({ activeId }) => save(KEY, activeId))
 
 export function subscribeClusterEvents() {
   try {

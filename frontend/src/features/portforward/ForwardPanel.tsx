@@ -11,7 +11,7 @@ function Live({ forward, onStop }: { forward: PortForward; onStop: () => void })
   return (
     <>
       <ForwardStatusPill forward={forward} />
-      <span className="font-mono text-[11.5px] font-medium text-accent">
+      <span className="font-mono text-xs font-medium text-accent">
         {forward.status === 'active' ? forwardAddress(forward) : '…'}
       </span>
       <button
@@ -52,12 +52,12 @@ function Start({
         title="Local port — empty picks a free one"
         onChange={(event) => onLocal(event.target.value)}
         onKeyDown={(event) => event.key === 'Enter' && onStart()}
-        className="w-14 shrink-0 rounded border border-line bg-surface px-1.5 py-0.5 text-center font-mono text-[11.5px] text-text outline-none focus:border-accent/60"
+        className="w-14 shrink-0 rounded border border-line bg-surface px-1.5 py-0.5 text-center font-mono text-xs text-text outline-none focus:border-accent/60"
       />
       <button
         onClick={onStart}
         disabled={busy}
-        className="shrink-0 rounded-md border border-accent/40 bg-accent-dim px-2 py-0.5 text-[11.5px] font-medium text-accent transition-colors hover:bg-accent hover:text-base disabled:opacity-40"
+        className="shrink-0 rounded-md border border-accent/40 bg-accent-dim px-2 py-0.5 text-xs font-medium text-accent transition-colors hover:bg-accent hover:text-base disabled:opacity-40"
       >
         {busy ? 'Starting…' : 'Forward'}
       </button>
@@ -123,7 +123,7 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
 
   return (
     <div className="mt-4 space-y-1.5">
-      <div className="text-[11px] uppercase tracking-wide text-faint">Port forwarding</div>
+      <div className="text-xs uppercase tracking-wide text-faint">Port forwarding</div>
 
       {rows.map((row) => {
         const live = mine.find((item) => item.remotePort === row.port)
@@ -131,7 +131,7 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
         return (
           <div
             key={row.port}
-            className="flex items-center gap-2 rounded-md border border-line bg-base px-2 py-1.5 text-[12px]"
+            className="flex items-center gap-2 rounded-md border border-line bg-base px-2 py-1.5 text-sm"
           >
             <span className="min-w-0 flex-1 truncate">
               <span className="font-mono font-medium text-ok">{row.port}</span>
@@ -153,7 +153,7 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
         )
       })}
 
-      <div className="flex items-center gap-2 rounded-md border border-dashed border-line px-2 py-1.5 text-[12px]">
+      <div className="flex items-center gap-2 rounded-md border border-dashed border-line px-2 py-1.5 text-sm">
         <input
           value={remote}
           placeholder={rows.length === 0 ? 'no declared port — enter one' : 'another port'}
@@ -162,7 +162,7 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
           onKeyDown={(event) =>
             event.key === 'Enter' && Number(remote) > 0 && void forward(Number(remote), '')
           }
-          className="min-w-0 flex-1 bg-transparent font-mono text-[11.5px] text-text outline-none placeholder:font-sans placeholder:text-faint"
+          className="min-w-0 flex-1 bg-transparent font-mono text-xs text-text outline-none placeholder:font-sans placeholder:text-faint"
         />
         <Start
           local={locals.custom ?? ''}
@@ -174,7 +174,7 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
         />
       </div>
 
-      {failed && <p className="font-mono text-[11px] text-danger">{failed}</p>}
+      {failed && <p className="font-mono text-xs text-danger">{failed}</p>}
     </div>
   )
 }

@@ -38,7 +38,7 @@ export function TargetPicker({
 
   return (
     <Menu.Root>
-      <Menu.Trigger className="flex max-w-52 items-center gap-1 rounded border border-line bg-base px-1.5 py-1 text-[11px] text-muted outline-none transition-colors hover:text-text data-[state=open]:border-accent/60">
+      <Menu.Trigger className="flex max-w-52 items-center gap-1 rounded border border-line bg-base px-1.5 py-1 text-xs text-muted outline-none transition-colors hover:text-text data-[state=open]:border-accent/60">
         <span className="truncate">{summary(targets, selection)}</span>
         <ChevronDown className="size-3 shrink-0" />
       </Menu.Trigger>
@@ -47,18 +47,18 @@ export function TargetPicker({
         <Menu.Content
           align="start"
           sideOffset={4}
-          className="z-50 max-h-96 min-w-64 overflow-y-auto rounded-md border border-line-strong bg-overlay p-1 text-[12px] shadow-xl"
+          className="z-50 max-h-96 min-w-64 overflow-y-auto rounded-md border border-line-strong bg-overlay p-1 text-sm shadow-xl"
         >
           <div className="flex gap-1 px-1 pb-1">
             <button
               onClick={() => onChange(targets.map(targetKey))}
-              className="rounded px-1.5 py-0.5 text-[11px] text-muted hover:bg-raised hover:text-text"
+              className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-raised hover:text-text"
             >
               Select all
             </button>
             <button
               onClick={() => onChange([])}
-              className="rounded px-1.5 py-0.5 text-[11px] text-muted hover:bg-raised hover:text-text"
+              className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-raised hover:text-text"
             >
               Clear
             </button>
@@ -67,7 +67,7 @@ export function TargetPicker({
           {pods.map(([pod, containers]) => (
             <div key={pod}>
               {pods.length > 1 && (
-                <div className="truncate px-2 pb-0.5 pt-1.5 font-mono text-[10.5px] text-faint">
+                <div className="truncate px-2 pb-0.5 pt-1.5 font-mono text-2xs text-faint">
                   {pod}
                 </div>
               )}
@@ -92,13 +92,13 @@ export function TargetPicker({
 
                     <span className="truncate">{target.container}</span>
                     {ROLES[target.role] && (
-                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-faint">
+                      <span className="shrink-0 text-2xs uppercase tracking-wide text-faint">
                         {ROLES[target.role]}
                       </span>
                     )}
                     <span
                       className={cn(
-                        'ml-auto shrink-0 text-[10.5px]',
+                        'ml-auto shrink-0 text-2xs',
                         target.restarts > 0 ? 'text-warn' : 'text-faint',
                       )}
                     >

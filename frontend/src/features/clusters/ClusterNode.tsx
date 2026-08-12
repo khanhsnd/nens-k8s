@@ -97,7 +97,7 @@ export function ClusterNode({ cluster, children }: { cluster: Cluster; children:
 
           <span
             className={cn(
-              'grid size-6 shrink-0 place-items-center rounded-md text-[10px] font-semibold',
+              'grid size-6 shrink-0 place-items-center rounded-md text-2xs font-semibold',
               active ? 'bg-accent text-base' : 'bg-raised text-muted group-hover:bg-overlay',
             )}
           >
@@ -107,7 +107,7 @@ export function ClusterNode({ cluster, children }: { cluster: Cluster; children:
           <span
             title={cluster.name}
             className={cn(
-              'flex-1 truncate text-[13.5px]',
+              'flex-1 truncate text-md',
               active ? 'font-semibold text-accent' : 'font-medium text-text',
             )}
           >
@@ -115,7 +115,7 @@ export function ClusterNode({ cluster, children }: { cluster: Cluster; children:
           </span>
 
           {cluster.phase === 'connected' && cluster.version && (
-            <span className="shrink-0 text-[10.5px] text-faint">{cluster.version}</span>
+            <span className="shrink-0 text-2xs text-faint">{cluster.version}</span>
           )}
 
           <Tooltip label={phase.label} side="top">
@@ -139,7 +139,7 @@ export function ClusterNode({ cluster, children }: { cluster: Cluster; children:
       {open && (
         <div className="ml-[15px] border-l border-line pl-1">
           {cluster.phase === 'error' && (
-            <p className="py-1.5 pl-6 pr-2 text-[11.5px] text-danger">
+            <p className="py-1.5 pl-6 pr-2 text-xs text-danger">
               {cluster.error || phase.label}
             </p>
           )}

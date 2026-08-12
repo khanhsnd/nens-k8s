@@ -27,6 +27,7 @@ import { TopBar } from './TopBar'
 
 export function AppShell() {
   const load = useClusters((s) => s.load)
+  const clusters = useClusters((s) => s.clusters)
   const clusterId = useClusters((s) => s.activeId)
   const phase = useClusters((s) => activeCluster(s)?.phase ?? null)
   const tabs = useTabs((s) => s.tabs)
@@ -53,6 +54,13 @@ export function AppShell() {
     void useForwards.getState().load()
     return subscribeForwardEvents()
   }, [])
+
+  // Saved forwards come back when their cluster connects — `sync` runs once per
+  // connection, so re-rendering on every cluster event costs nothing.
+  useEffect(() => {
+    const connected = clusters.filter((item) => item.phase === 'connected').map((item) => item.id)
+    void useForwards.getState().sync(connected)
+  }, [clusters])
 
   useEffect(() => {
     const kinds = tabs

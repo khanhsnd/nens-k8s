@@ -9,7 +9,7 @@ import { useEffect, useRef } from 'react'
 const theme = EditorView.theme({
   '&': { height: '100%', backgroundColor: 'var(--color-base)', color: 'var(--color-text)' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.6' },
+  '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', lineHeight: '1.6' },
   '.cm-content': { userSelect: 'text', caretColor: 'var(--color-accent)' },
   '.cm-gutters': {
     backgroundColor: 'var(--color-surface)',

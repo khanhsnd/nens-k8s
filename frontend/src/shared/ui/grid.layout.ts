@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
+import { load, save } from '@/shared/lib/persist'
 import type { Column } from './DataGrid'
 
 export type GridLayout = {
@@ -8,18 +9,10 @@ export type GridLayout = {
   widths?: Record<string, number>
 }
 
-const STORAGE_KEY = 'nens:grid-layouts'
+const KEY = 'grid-layouts'
 
-function load(): Record<string, GridLayout> {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-  } catch {
-    return {}
-  }
-}
-
-function save(layouts: Record<string, GridLayout>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts))
+function keep(layouts: Record<string, GridLayout>) {
+  save(KEY, layouts)
   return { layouts }
 }
 
@@ -30,15 +23,15 @@ type LayoutState = {
 }
 
 const useLayouts = create<LayoutState>((set) => ({
-  layouts: load(),
+  layouts: load<Record<string, GridLayout>>(KEY, {}),
 
   patch: (id, change) =>
-    set((state) => save({ ...state.layouts, [id]: { ...state.layouts[id], ...change } })),
+    set((state) => keep({ ...state.layouts, [id]: { ...state.layouts[id], ...change } })),
 
   reset: (id) =>
     set((state) => {
       const { [id]: _dropped, ...rest } = state.layouts
-      return save(rest)
+      return keep(rest)
     }),
 }))
 

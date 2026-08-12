@@ -13,7 +13,7 @@ export function StatusBar() {
   const offline = useClusters((s) => s.offline)
 
   return (
-    <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-[11px] text-faint">
+    <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-xs text-faint">
       <span className="flex items-center gap-1.5">
         <Dot tone={cluster ? PHASE_TONE[cluster.phase] : 'neutral'} />
         {cluster?.name ?? 'no cluster'}

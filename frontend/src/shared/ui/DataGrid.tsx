@@ -227,7 +227,7 @@ export function DataGrid<T>({
                     selectColumn(c, event.shiftKey)
                     startReorder(column, event)
                   }}
-                  className="min-w-0 flex-1 cursor-grab truncate px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide active:cursor-grabbing"
+                  className="min-w-0 flex-1 cursor-grab truncate px-3 py-2 text-left text-xs font-medium uppercase tracking-wide active:cursor-grabbing"
                 >
                   {column.header ?? column.label}
                 </button>
@@ -293,7 +293,7 @@ export function DataGrid<T>({
                   minWidth: columnsWidth + actionsWidth,
                 }}
                 className={cn(
-                  'absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-[12.5px]',
+                  'absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-sm',
                   background,
                 )}
               >
@@ -362,7 +362,7 @@ export function DataGrid<T>({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-4 py-1.5 text-[11px] text-faint">
+      <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-4 py-1.5 text-xs text-faint">
         <span>{rows.length} items</span>
         {(selectedRows > 1 || selectedCols > 1) && (
           <span className="text-muted">
