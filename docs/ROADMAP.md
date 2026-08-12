@@ -26,12 +26,19 @@ Table renders fixture data; falls back to fixtures when the Wails bridge is abse
 Exit: Pods, Deployments, Nodes, Services, ConfigMaps live. Verified against fixtures and
 `client-go`'s fake dynamic client; not yet run against a real cluster.
 
-## Phase 3 — Detail + YAML
+## Phase 3 — Detail + YAML (done)
 
-- `ResourceAPI.Get` / `Apply` (server-side apply via `dynamic`) / `Delete` / `Scale`.
-- CodeMirror 6 + YAML mode in the drawer's YAML tab, dirty-state guard, apply on save.
-- Owner-reference graph in Overview (pod → replicaset → deployment).
-- Related events list filtered by `involvedObject.uid`.
+- `internal/kube/resource.Editor`: `Get` / `Apply` (forced server-side apply, field manager `nens`) /
+  `Delete` / `Scale` (the `scale` subresource) / `Owners` / `Events`, all on `domain.ResourceRef`.
+- `ResourceAPI` exposes them; `domain.ResourceEditor` is the port.
+- CodeMirror 6 + YAML mode in the drawer's YAML tab (`shared/ui/CodeEditor.tsx`), Ctrl+S applies,
+  dirty-state guard on drawer close / drawer tab switch / row selection.
+- Owner-reference chain in Overview (pod → replicaset → deployment).
+- Events tab filtered by `involvedObject.uid`, newest first.
+- Delete and Scale live in the drawer header menu.
+
+Exit: verified against fixtures (browser dev server) and the fake dynamic client. The write paths
+(`Apply`, `Delete`, `Scale`) have never run against a real API server.
 
 ## Phase 4 — Logs
 

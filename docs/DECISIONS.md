@@ -145,6 +145,103 @@ content scrolls over the cells behind it. It is deliberately not a `Column` in t
 spec — selection, copy and keyboard navigation are keyed by `columns.length` and must not
 see it.
 
+## Column layout
+
+### The layout is per grid id, the spec stays immutable data
+
+`shared/ui/grid.layout.ts` keeps `{ order, hidden, widths }` per `layoutId` (the kind id) in one
+localStorage key, and `useGridLayout` folds it over the kind's `Column[]`. The columns file stays
+the single description of a kind — `hidden: true` is the *default* visibility, `fixed: true` marks
+a column the menu cannot untick — and user preference never edits it. Unknown saved keys are
+ignored and new columns land at their spec position, so shipping a column never breaks a saved
+layout.
+
+Widths are stored per key: a column the user never dragged keeps its `minmax(min, grow fr)` track,
+a dragged one becomes a fixed px track. Width `0` means "auto" again, which is what
+double-clicking the resize handle writes.
+
+### Reorder is pointer-based, not HTML5 drag-and-drop
+
+Header reordering listens on `pointerdown/move/up` and resolves the drop column with
+`document.elementFromPoint` → `[data-column]`, the same shape as the cell range drag. The `draggable`
+attribute was the obvious alternative and is worse here: `dataTransfer` drags are unreliable inside
+the WebView2 host and untestable from the browser harness.
+
+### The column menu lives outside the scrolled header
+
+The header is a flex row: a clipped track area that translates with the body's `scrollLeft`, plus a
+fixed 36px cell holding the menu. That cell is a sibling of the scrolled area rather than a `sticky`
+last track, because sticky inside the translated grid does not stay pinned. `scrollbar-gutter: stable`
+on the flex row makes its content box match the body's, so header tracks stay aligned with the row
+cells and the menu sits exactly over the row-actions column.
+
+### Pod warnings are derived from container state, not events
+
+`podWarnings` flags a container that waits on anything other than `ContainerCreating`/
+`PodInitializing`, terminates non-zero, or is not ready while the pod says `Running`. Lens computes
+that column from warning `Event` objects — we have no events until phase 3, and container state is
+the signal that actually explains the row. Restart count alone is deliberately not a warning: a pod
+that restarted once a week ago would then stay yellow forever.
+
+### CPU/Memory columns exist but have no source yet
+
+They read `K8sObject.metrics`, which nothing populates until phase 7 wires `metrics.k8s.io`, so they
+ship hidden by default and render `—` when ticked. Shipping them visible would put two dead columns
+in front of every user; leaving them out would mean re-doing the column spec in phase 7.
+
+## Phase 3 — detail, YAML, events
+
+### Writes are a second adapter, not more `Store`
+
+`resource.Store` owns informers; `resource.Editor` owns one-shot reads and writes. They share the
+package (and `trim`) but nothing else — the store is stateful and ref-counted, the editor is
+stateless and per-call. `ResourceAPI` holds both ports, which is why `NewResourceAPI` takes two
+arguments.
+
+`cluster.NewConnection` exists so the editor can be tested with a fake dynamic client and a static
+`RESTMapper`; `Dial` is now the "build the clients from a `rest.Config`" path on top of it.
+
+### Apply is forced server-side apply, and the resourceVersion is the concurrency check
+
+`Apply` sends the edited object as an apply patch with field manager `nens` and `Force: true`, the
+same shape as `kubectl apply --server-side --force-conflicts`. The editor loads the object with
+`Get`, so the buffer still carries `metadata.resourceVersion` — the API server then rejects the
+apply if anything changed underneath, and the drawer's Reload button is the way out. Dropping
+`resourceVersion` before sending would silently overwrite a concurrent change.
+
+`k8s.io/client-go/dynamic/fake` cannot merge apply patches into unstructured objects, so
+`TestApplySendsTheEditedObjectAsAnApplyPatch` asserts the request through a reactor instead of the
+stored result.
+
+### Scale patches the `scale` subresource
+
+A merge patch of `spec.replicas` on the main resource would work for Deployments, but the subresource
+is what RBAC `scale` verbs and CRDs with a scale subresource expose, so `Scale` patches
+`.../scale` — one code path for every scalable kind.
+
+### The YAML tab reads through `Get`, not the informer cache
+
+The cache is the source of truth for tables, and re-reading a single object for the drawer is not the
+re-`List` the performance budget forbids. It matters that the editor buffer is a snapshot: an object
+that keeps arriving from the watch would fight the user's cursor, and applying a cache object could
+send a `resourceVersion` older than what is stored.
+
+### YAML lives in the frontend
+
+`Get`/`Apply` move `map[string]any` over the bridge and the `yaml` package renders and parses it in
+the browser. Go marshals maps with sorted keys, which is exactly what `kubectl get -o yaml` prints,
+so nothing is lost — and parse errors surface in the drawer before a round trip, while fixture mode
+gets a YAML tab for free.
+
+### The dirty guard is a store, not a prop
+
+`features/resources/editor.store.ts` holds `dirty` plus one `pending` action. Anything that would
+throw the buffer away — the drawer's close button, its tab strip, selecting another row in
+`AppShell` — calls `guard(action)`, and `DiscardGuard` renders the confirmation when a pending
+action exists. Threading a callback down instead would have stopped at the drawer, and row selection
+lives two components above it. Closing the app tab is deliberately not guarded: the tab is the
+subscription's owner, and blocking it would mean blocking cluster switches too.
+
 ## Testing
 
 `internal/kube/resource` is covered by `k8s.io/client-go/dynamic/fake`, which drives a

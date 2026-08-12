@@ -1,41 +1,81 @@
 import { X } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEditorGuard } from '@/features/resources/editor.store'
 import type { Kind } from '@/features/resources/kinds'
+import { refOf } from '@/features/resources/object.api'
+import { ObjectActions } from '@/features/resources/ObjectActions'
+import { ObjectEvents } from '@/features/resources/ObjectEvents'
+import { ObjectOverview } from '@/features/resources/ObjectOverview'
+import { ObjectYaml } from '@/features/resources/ObjectYaml'
 import type { K8sObject } from '@/features/resources/resource.types'
 import { cn } from '@/shared/lib/cn'
 
-const TABS = ['Overview', 'YAML', 'Logs', 'Events', 'Shell'] as const
+const TABS = ['Overview', 'YAML', 'Events', 'Logs', 'Shell'] as const
+const PHASE: Partial<Record<(typeof TABS)[number], string>> = { Logs: '4', Shell: '5' }
 
-const PHASE = { YAML: '3', Logs: '4', Events: '3', Shell: '5' } as const
+const MIN_WIDTH = 360
+const MAX_WIDTH = 1100
 
-function Field({ label, value }: { label: string; value: string }) {
+function ResizeHandle({ onResize }: { onResize: (width: number) => void }) {
+  const dragging = useRef(false)
+
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      if (dragging.current) onResize(window.innerWidth - event.clientX)
+    }
+    const up = () => {
+      dragging.current = false
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+  }, [onResize])
+
   return (
-    <div className="grid grid-cols-[110px_1fr] gap-3 py-1.5">
-      <dt className="text-faint">{label}</dt>
-      <dd className="truncate font-mono text-[12px]">{value}</dd>
-    </div>
+    <div
+      onPointerDown={() => {
+        dragging.current = true
+      }}
+      className="absolute left-0 top-0 h-full w-1 cursor-col-resize transition-colors hover:bg-accent/40"
+    />
   )
 }
 
 export function DetailDrawer({
   object,
   kind,
+  clusterId,
   onClose,
 }: {
   object: K8sObject
   kind: Kind
+  clusterId: string
   onClose: () => void
 }) {
+  const guard = useEditorGuard((s) => s.guard)
   const [tab, setTab] = useState<(typeof TABS)[number]>('Overview')
-  const labels = Object.entries(object.metadata.labels ?? {})
+  const [width, setWidth] = useState(460)
+
+  const uid = object.metadata.uid
+  const target = useMemo(() => refOf(clusterId, kind, object), [clusterId, kind, uid])
+  const resize = useCallback((next: number) => setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next))), [])
 
   return (
-    <aside className="flex w-[420px] shrink-0 flex-col border-l border-line bg-surface">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-4">
-        <span className="truncate text-[13px] font-semibold">{object.metadata.name}</span>
+    <aside
+      style={{ width }}
+      className="relative flex shrink-0 flex-col border-l border-line bg-surface"
+    >
+      <ResizeHandle onResize={resize} />
+
+      <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-4">
+        <span className="mr-auto truncate text-[13px] font-semibold">{object.metadata.name}</span>
+        <ObjectActions target={target} object={object} onDeleted={onClose} />
         <button
-          onClick={onClose}
-          className="ml-auto grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-raised hover:text-text"
+          onClick={() => guard(onClose)}
+          className="grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-raised hover:text-text"
         >
           <X className="size-4" />
         </button>
@@ -45,7 +85,7 @@ export function DetailDrawer({
         {TABS.map((item) => (
           <button
             key={item}
-            onClick={() => setTab(item)}
+            onClick={() => guard(() => setTab(item))}
             className={cn(
               'relative px-2.5 py-2 text-[12px] transition-colors',
               tab === item ? 'text-accent' : 'text-muted hover:text-text',
@@ -59,37 +99,12 @@ export function DetailDrawer({
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {tab === 'Overview' ? (
-          <>
-            <dl className="text-[12px]">
-              <Field label="Kind" value={object.kind ?? '—'} />
-              {kind.columns
-                .filter((column) => column.key !== 'name')
-                .map((column) => (
-                  <Field key={column.key} label={column.label} value={column.text(object)} />
-                ))}
-              <Field label="UID" value={object.metadata.uid} />
-            </dl>
-
-            {labels.length > 0 && (
-              <div className="mt-4 space-y-1.5">
-                <div className="text-[11px] uppercase tracking-wide text-faint">Labels</div>
-                <div className="flex flex-wrap gap-1">
-                  {labels.map(([key, value]) => (
-                    <span
-                      key={key}
-                      className="truncate rounded bg-raised px-1.5 py-0.5 font-mono text-[11px] text-muted"
-                    >
-                      {key}={value}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="grid h-full place-items-center text-[12px] text-faint">
+      <div className="flex min-h-0 flex-1 flex-col">
+        {tab === 'Overview' && <ObjectOverview object={object} kind={kind} target={target} />}
+        {tab === 'YAML' && <ObjectYaml target={target} />}
+        {tab === 'Events' && <ObjectEvents target={target} />}
+        {PHASE[tab] && (
+          <div className="grid flex-1 place-items-center text-[12px] text-faint">
             {tab} panel — phase {PHASE[tab]}
           </div>
         )}

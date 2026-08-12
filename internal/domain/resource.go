@@ -11,6 +11,7 @@ type ResourceRef struct {
 	GVR       GVR    `json:"gvr"`
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
+	UID       string `json:"uid"`
 }
 
 type EventType string
@@ -40,6 +41,23 @@ type Subscription struct {
 	ClusterID string `json:"clusterId"`
 	GVR       GVR    `json:"gvr"`
 	Namespace string `json:"namespace"`
+}
+
+type OwnerRef struct {
+	GVR       GVR    `json:"gvr"`
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	UID       string `json:"uid"`
+}
+
+type EventRecord struct {
+	Type    string `json:"type"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+	Source  string `json:"source"`
+	Count   int64  `json:"count"`
+	Last    string `json:"last"`
 }
 
 type APIResource struct {

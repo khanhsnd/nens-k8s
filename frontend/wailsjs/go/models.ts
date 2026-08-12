@@ -28,6 +28,28 @@ export namespace domain {
 	        this.error = source["error"];
 	    }
 	}
+	export class EventRecord {
+	    type: string;
+	    reason: string;
+	    message: string;
+	    source: string;
+	    count: number;
+	    last: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EventRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.reason = source["reason"];
+	        this.message = source["message"];
+	        this.source = source["source"];
+	        this.count = source["count"];
+	        this.last = source["last"];
+	    }
+	}
 	export class GVR {
 	    group: string;
 	    version: string;
@@ -61,6 +83,82 @@ export namespace domain {
 	        this.removable = source["removable"];
 	        this.error = source["error"];
 	    }
+	}
+	export class OwnerRef {
+	    gvr: GVR;
+	    kind: string;
+	    name: string;
+	    namespace: string;
+	    uid: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OwnerRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.gvr = this.convertValues(source["gvr"], GVR);
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.namespace = source["namespace"];
+	        this.uid = source["uid"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ResourceRef {
+	    clusterId: string;
+	    gvr: GVR;
+	    namespace: string;
+	    name: string;
+	    uid: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResourceRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusterId = source["clusterId"];
+	        this.gvr = this.convertValues(source["gvr"], GVR);
+	        this.namespace = source["namespace"];
+	        this.name = source["name"];
+	        this.uid = source["uid"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Subscription {
 	    token: string;

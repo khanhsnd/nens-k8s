@@ -6,7 +6,7 @@ import (
 
 	"nens-k8s/internal/domain"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -22,7 +22,7 @@ type Connection struct {
 	clientset *kubernetes.Clientset
 	dynamic   dynamic.Interface
 	discovery discovery.CachedDiscoveryInterface
-	mapper    meta.RESTMapper
+	mapper    apimeta.RESTMapper
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -44,22 +44,28 @@ func Dial(parent context.Context, meta domain.Cluster, config *rest.Config) (*Co
 	}
 
 	cached := memory.NewMemCacheClient(clientset.Discovery())
-	ctx, cancel := context.WithCancel(parent)
 
 	meta.Version = version.GitVersion
 	meta.Phase = domain.PhaseConnected
 	meta.Error = ""
 
+	conn := NewConnection(parent, meta, dyn, restmapper.NewDeferredDiscoveryRESTMapper(cached))
+	conn.config = config
+	conn.clientset = clientset
+	conn.discovery = cached
+	return conn, nil
+}
+
+func NewConnection(parent context.Context, meta domain.Cluster, dyn dynamic.Interface, mapper apimeta.RESTMapper) *Connection {
+	ctx, cancel := context.WithCancel(parent)
+
 	return &Connection{
-		meta:      meta,
-		config:    config,
-		clientset: clientset,
-		dynamic:   dyn,
-		discovery: cached,
-		mapper:    restmapper.NewDeferredDiscoveryRESTMapper(cached),
-		ctx:       ctx,
-		cancel:    cancel,
-	}, nil
+		meta:    meta,
+		dynamic: dyn,
+		mapper:  mapper,
+		ctx:     ctx,
+		cancel:  cancel,
+	}
 }
 
 func (c *Connection) Meta() domain.Cluster {
@@ -77,6 +83,8 @@ func (c *Connection) Rename(name string) {
 }
 
 func (c *Connection) Dynamic() dynamic.Interface { return c.dynamic }
+
+func (c *Connection) Mapper() apimeta.RESTMapper { return c.mapper }
 
 func (c *Connection) Context() context.Context { return c.ctx }
 

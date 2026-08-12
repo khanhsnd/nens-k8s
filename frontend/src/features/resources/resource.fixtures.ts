@@ -1,4 +1,4 @@
-import type { K8sObject } from './resource.types'
+import type { EventRecord, K8sObject, OwnerRef } from './resource.types'
 
 const NAMESPACES = ['default', 'kube-system', 'monitoring', 'ingress-nginx', 'argocd']
 const APPS = ['api-gateway', 'auth-svc', 'billing', 'worker', 'redis', 'postgres', 'nginx', 'otel-collector']
@@ -39,13 +39,19 @@ function makePods(count = 800): K8sObject[] {
     return {
       apiVersion: 'v1',
       kind: 'Pod',
-      metadata: meta(name, index, namespace),
+      metadata: {
+        ...meta(name, index, namespace),
+        ownerReferences: [
+          { kind: 'ReplicaSet', name: `${app}-${(7000 + index).toString(36)}`, controller: true },
+        ],
+      },
       spec: {
         nodeName: `node-${(index % 6) + 1}.sgn.internal`,
         containers: [{ name: app, image: `registry.internal/${app}:1.${index % 9}.0` }],
       },
       status: {
         phase: phase === 'CrashLoopBackOff' ? 'Running' : phase,
+        qosClass: index % 3 === 0 ? 'Guaranteed' : index % 3 === 1 ? 'Burstable' : 'BestEffort',
         podIP: `10.244.${index % 6}.${(index % 250) + 2}`,
         containerStatuses: [
           {
@@ -136,4 +142,68 @@ const cache = new Map<string, K8sObject[]>()
 export function fixtureObjects(kindId: string): K8sObject[] {
   if (!cache.has(kindId)) cache.set(kindId, BUILDERS[kindId]?.() ?? [])
   return cache.get(kindId) ?? []
+}
+
+const apps = (resource: string) => ({ group: 'apps', version: 'v1', resource })
+
+export function fixtureOwners(object: K8sObject): OwnerRef[] {
+  const owner = object.metadata.ownerReferences?.[0]
+  if (!owner) return []
+
+  const namespace = object.metadata.namespace ?? ''
+  const chain: OwnerRef[] = [
+    {
+      gvr: apps('replicasets'),
+      kind: owner.kind,
+      name: owner.name,
+      namespace,
+      uid: `${namespace}/${owner.name}`,
+    },
+  ]
+
+  if (owner.kind === 'ReplicaSet') {
+    const name = owner.name.split('-').slice(0, -1).join('-')
+    chain.push({
+      gvr: apps('deployments'),
+      kind: 'Deployment',
+      name,
+      namespace,
+      uid: `${namespace}/${name}`,
+    })
+  }
+  return chain
+}
+
+export function fixtureEvents(object: K8sObject): EventRecord[] {
+  const minutes = (count: number) => new Date(Date.now() - count * 60_000).toISOString()
+  const events: EventRecord[] = [
+    {
+      type: 'Normal',
+      reason: 'Scheduled',
+      message: `Successfully assigned ${object.metadata.name} to ${object.spec?.nodeName ?? 'a node'}`,
+      source: 'default-scheduler',
+      count: 1,
+      last: minutes(24),
+    },
+    {
+      type: 'Normal',
+      reason: 'Pulled',
+      message: 'Container image already present on machine',
+      source: 'kubelet',
+      count: 1,
+      last: minutes(23),
+    },
+  ]
+
+  if (object.status?.phase && object.status.phase !== 'Running') {
+    events.unshift({
+      type: 'Warning',
+      reason: 'BackOff',
+      message: `Back-off restarting failed container in pod ${object.metadata.name}`,
+      source: 'kubelet',
+      count: 12,
+      last: minutes(2),
+    })
+  }
+  return events
 }

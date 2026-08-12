@@ -41,6 +41,15 @@ type ResourceSubscriber interface {
 	Unsubscribe(token string) error
 }
 
+type ResourceEditor interface {
+	Get(ctx context.Context, ref ResourceRef) (map[string]any, error)
+	Apply(ctx context.Context, ref ResourceRef, object map[string]any) (map[string]any, error)
+	Delete(ctx context.Context, ref ResourceRef) error
+	Scale(ctx context.Context, ref ResourceRef, replicas int32) error
+	Owners(ctx context.Context, ref ResourceRef) ([]OwnerRef, error)
+	Events(ctx context.Context, ref ResourceRef) ([]EventRecord, error)
+}
+
 type Publisher interface {
 	Publish(topic string, payload any)
 }

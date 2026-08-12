@@ -10,7 +10,6 @@ import (
 	"nens-k8s/internal/domain"
 	"nens-k8s/internal/kube/cluster"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 )
@@ -94,14 +93,9 @@ func (s *Store) Unsubscribe(token string) error {
 }
 
 func (s *Store) start(conn *cluster.Connection, key target) *watch {
-	gvr := schema.GroupVersionResource{
-		Group:    key.gvr.Group,
-		Version:  key.gvr.Version,
-		Resource: key.gvr.Resource,
-	}
 	informer := dynamicinformer.NewFilteredDynamicInformer(
 		conn.Dynamic(),
-		gvr,
+		schemaGVR(key.gvr),
 		key.namespace,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},

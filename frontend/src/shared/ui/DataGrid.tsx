@@ -1,7 +1,16 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { MoreHorizontal } from 'lucide-react'
-import { useCallback, useEffect, useRef, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { cn } from '@/shared/lib/cn'
+import { ColumnMenu } from './ColumnMenu'
+import { useGridLayout } from './grid.layout'
 import { useGridSelection, type Rect } from './grid.selection'
 
 export type Column<T> = {
@@ -11,12 +20,16 @@ export type Column<T> = {
   grow: number
   text: (row: T) => string
   cell?: (row: T) => ReactNode
+  header?: ReactNode
+  fixed?: boolean
+  hidden?: boolean
 }
 
 const ROW_HEIGHT = 30
 const ACTIONS_WIDTH = 36
 const AUTOSCROLL_EDGE = 28
 const AUTOSCROLL_SPEED = 12
+const REORDER_THRESHOLD = 6
 
 function edgeShadow(r: number, c: number, rect: Rect, focused: boolean): string | undefined {
   const shadows = [
@@ -30,12 +43,14 @@ function edgeShadow(r: number, c: number, rect: Rect, focused: boolean): string 
 }
 
 export function DataGrid<T>({
+  layoutId,
   rows,
   columns,
   rowKey,
   activeKey,
   onActivate,
 }: {
+  layoutId: string
   rows: T[]
   columns: Column<T>[]
   rowKey: (row: T) => string
@@ -47,11 +62,20 @@ export function DataGrid<T>({
   const pointer = useRef({ x: 0, y: 0 })
   const endDrag = useRef(() => {})
 
-  const template = columns
-    .map((column) => `minmax(${column.min}px, ${column.grow}fr)`)
-    .concat(`${ACTIONS_WIDTH}px`)
-    .join(' ')
-  const minWidth = columns.reduce((total, column) => total + column.min, ACTIONS_WIDTH)
+  const layout = useGridLayout(layoutId, columns)
+  const [resizing, setResizing] = useState<{ key: string; width: number } | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
+
+  const visible = layout.visible
+  const widthOf = (column: Column<T>) =>
+    resizing?.key === column.key ? resizing.width : layout.widths[column.key]
+  const trackOf = (column: Column<T>) => {
+    const width = widthOf(column)
+    return width ? `${width}px` : `minmax(${column.min}px, ${column.grow}fr)`
+  }
+
+  const template = visible.map(trackOf).join(' ')
+  const columnsWidth = visible.reduce((total, column) => total + (widthOf(column) || column.min), 0)
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -62,11 +86,57 @@ export function DataGrid<T>({
 
   const { rect, focus, goTo, extendTo, selectColumn, onKeyDown } = useGridSelection({
     rowCount: rows.length,
-    colCount: columns.length,
-    getText: (r, c) => columns[c].text(rows[r]),
+    colCount: visible.length,
+    getText: (r, c) => visible[c].text(rows[r]),
     onActivate: (r) => onActivate?.(rows[r]),
     onReveal: (r) => virtualizer.scrollToIndex(r),
   })
+
+  const startReorder = (column: Column<T>, event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return
+
+    const start = event.clientX
+    const targetAt = (at: PointerEvent) => {
+      if (Math.abs(at.clientX - start) < REORDER_THRESHOLD) return null
+      const target = document
+        .elementFromPoint(at.clientX, at.clientY)
+        ?.closest<HTMLElement>('[data-column]')?.dataset.column
+      return target && target !== column.key ? target : null
+    }
+
+    const onMove = (move: PointerEvent) => setDropTarget(targetAt(move))
+    const onUp = (up: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      const target = targetAt(up)
+      setDropTarget(null)
+      if (target) layout.move(column.key, target)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  const startResize = (column: Column<T>, event: ReactPointerEvent<HTMLElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const start = event.clientX
+    const from = event.currentTarget.parentElement?.getBoundingClientRect().width ?? column.min
+    const widthAt = (x: number) => Math.max(column.min, Math.round(from + x - start))
+
+    const onMove = (move: PointerEvent) =>
+      setResizing({ key: column.key, width: widthAt(move.clientX) })
+    const onUp = (up: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setResizing(null)
+      layout.resize(column.key, widthAt(up.clientX))
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
   const cellAtPointer = useCallback(() => {
     const element = document.elementFromPoint(pointer.current.x, pointer.current.y)
@@ -127,23 +197,57 @@ export function DataGrid<T>({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-base">
-      <div className="shrink-0 overflow-hidden border-b border-line bg-surface [scrollbar-gutter:stable]">
-        <div ref={headerRef} style={{ gridTemplateColumns: template, minWidth }} className="grid">
-          {columns.map((column, c) => (
-            <button
-              key={column.key}
-              onPointerDown={(event) => selectColumn(c, event.shiftKey)}
-              className={cn(
-                'truncate border-r border-line/60 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide',
-                c >= rect.left && c <= rect.right
-                  ? 'bg-accent-dim text-accent'
-                  : 'text-faint hover:bg-raised',
-              )}
-            >
-              {column.label}
-            </button>
-          ))}
-          <div />
+      <div className="flex shrink-0 overflow-hidden border-b border-line bg-surface [scrollbar-gutter:stable]">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div
+            ref={headerRef}
+            style={{ gridTemplateColumns: template, minWidth: columnsWidth }}
+            className="grid"
+          >
+            {visible.map((column, c) => (
+              <div
+                key={column.key}
+                data-column={column.key}
+                className={cn(
+                  'relative flex border-r border-line/60',
+                  c >= rect.left && c <= rect.right
+                    ? 'bg-accent-dim text-accent'
+                    : 'text-faint hover:bg-raised',
+                  dropTarget === column.key && 'shadow-[inset_2px_0_0_0_var(--color-accent)]',
+                )}
+              >
+                <button
+                  title={column.label}
+                  onPointerDown={(event) => {
+                    selectColumn(c, event.shiftKey)
+                    startReorder(column, event)
+                  }}
+                  className="min-w-0 flex-1 cursor-grab truncate px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide active:cursor-grabbing"
+                >
+                  {column.header ?? column.label}
+                </button>
+
+                <div
+                  onPointerDown={(event) => startResize(column, event)}
+                  onDoubleClick={() => layout.resize(column.key, 0)}
+                  title="Drag to resize · double-click to auto-fit"
+                  className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-accent/60"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          style={{ width: ACTIONS_WIDTH }}
+          className="grid shrink-0 place-items-center border-l border-line/60"
+        >
+          <ColumnMenu
+            columns={layout.ordered}
+            hidden={layout.hidden}
+            onToggle={layout.toggle}
+            onReset={layout.reset}
+          />
         </div>
       </div>
 
@@ -158,7 +262,10 @@ export function DataGrid<T>({
         }}
         className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll outline-none [scrollbar-gutter:stable]"
       >
-        <div style={{ height: virtualizer.getTotalSize(), minWidth }} className="relative">
+        <div
+          style={{ height: virtualizer.getTotalSize(), minWidth: columnsWidth + ACTIONS_WIDTH }}
+          className="relative"
+        >
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]
             if (!row) return null
@@ -177,15 +284,15 @@ export function DataGrid<T>({
                 style={{
                   transform: `translateY(${item.start}px)`,
                   height: ROW_HEIGHT,
-                  gridTemplateColumns: template,
-                  minWidth,
+                  gridTemplateColumns: `${template} ${ACTIONS_WIDTH}px`,
+                  minWidth: columnsWidth + ACTIONS_WIDTH,
                 }}
                 className={cn(
                   'absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-[12.5px]',
                   background,
                 )}
               >
-                {columns.map((column, c) => {
+                {visible.map((column, c) => {
                   const inRange =
                     item.index >= rect.top &&
                     item.index <= rect.bottom &&

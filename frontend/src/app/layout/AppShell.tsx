@@ -4,6 +4,8 @@ import {
   subscribeClusterEvents,
   useClusters,
 } from '@/features/clusters/cluster.store'
+import { DiscardGuard } from '@/features/resources/DiscardGuard'
+import { useEditorGuard } from '@/features/resources/editor.store'
 import { kindFor, type Kind } from '@/features/resources/kinds'
 import { sliceKey, subscribeResourceEvents, useResources } from '@/features/resources/resource.store'
 import { ResourceView } from '@/features/resources/ResourceView'
@@ -24,6 +26,7 @@ export function AppShell() {
   const tabs = useTabs((s) => s.tabs)
   const tab = useTabs(activeTab)
   const sync = useResources((s) => s.sync)
+  const guard = useEditorGuard((s) => s.guard)
 
   const [selected, setSelected] = useState<{ key: string; uid: string } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -59,8 +62,10 @@ export function AppShell() {
         sliceKey={key}
         selectedUid={selected?.key === key ? selected.uid : null}
         onSelect={(row) =>
-          setSelected((current) =>
-            current?.uid === row.metadata.uid ? null : { key, uid: row.metadata.uid },
+          guard(() =>
+            setSelected((current) =>
+              current?.uid === row.metadata.uid ? null : { key, uid: row.metadata.uid },
+            ),
           )
         }
       />
@@ -81,13 +86,19 @@ export function AppShell() {
           </div>
         </main>
 
-        {selectedObject && kind && (
-          <DetailDrawer object={selectedObject} kind={kind} onClose={() => setSelected(null)} />
+        {selectedObject && kind && clusterId && (
+          <DetailDrawer
+            object={selectedObject}
+            kind={kind}
+            clusterId={clusterId}
+            onClose={() => setSelected(null)}
+          />
         )}
       </div>
 
       <StatusBar />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <DiscardGuard />
     </div>
   )
 }

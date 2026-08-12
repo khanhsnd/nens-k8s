@@ -25,14 +25,12 @@ func New() *App {
 	bus := event.NewBus()
 	loader := kubeconfig.NewLoader(config.NewStore())
 	registry := cluster.NewRegistry(loader, bus)
-	resources := resource.NewStore(registry, bus)
-
 	return &App{
 		bus:         bus,
 		registry:    registry,
 		clusters:    NewClusterAPI(registry),
 		kubeconfigs: NewKubeconfigAPI(loader),
-		resources:   NewResourceAPI(resources),
+		resources:   NewResourceAPI(resource.NewStore(registry, bus), resource.NewEditor(registry)),
 	}
 }
 
@@ -41,6 +39,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.bus.Bind(ctx)
 	a.clusters.bind(ctx)
 	a.kubeconfigs.bind(ctx)
+	a.resources.bind(ctx)
 }
 
 func (a *App) Shutdown(_ context.Context) {

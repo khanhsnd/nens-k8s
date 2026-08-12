@@ -6,6 +6,7 @@ export const NAME_COLUMN: ResourceColumn = {
   label: 'Name',
   min: 220,
   grow: 2.4,
+  fixed: true,
   text: (row) => row.metadata.name,
   cell: (row) => <span className="font-medium text-text">{row.metadata.name}</span>,
 }

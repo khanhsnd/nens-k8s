@@ -70,6 +70,7 @@ export function ResourceTable({
       </div>
 
       <DataGrid
+        layoutId={kind.id}
         rows={visible}
         columns={kind.columns}
         rowKey={(row) => row.metadata.uid}
