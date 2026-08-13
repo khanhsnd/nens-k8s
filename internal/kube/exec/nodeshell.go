@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"nens-k8s/internal/domain"
@@ -53,12 +54,18 @@ func (r *Runner) NodeShell(
 		return err
 	}
 
+	slog.Info("node shell pod created", "cluster", clusterID, "node", node, "pod", pod.Name)
+
 	remove := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), removeTimeout)
 		defer cancel()
 
 		grace := int64(0)
-		_ = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &grace})
+		if err := client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &grace}); err != nil {
+			slog.Error("node shell pod left behind", "cluster", clusterID, "pod", pod.Name, "error", err)
+			return
+		}
+		slog.Info("node shell pod removed", "cluster", clusterID, "pod", pod.Name)
 	}
 
 	if err := waitRunning(ctx, client, pod.Name); err != nil {

@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test
+        run: go test ./...
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          $makensis = Get-ChildItem 'C:\Program Files (x86)\NSIS', 'C:\Program Files\NSIS' -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($null -eq $makensis) { throw 'NSIS installed but makensis.exe was not found' }
+          $makensis.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install Wails
+        shell: pwsh
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+
+      - name: Stamp the version
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          $config = Get-Content wails.json -Raw | ConvertFrom-Json
+          $config.info.productVersion = $version
+          $config | ConvertTo-Json -Depth 10 | Set-Content wails.json -Encoding utf8
+
+      - name: Build the installer
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          wails build -platform windows/amd64 -nsis
+          $built = Get-ChildItem build/bin -Filter '*-installer.exe' | Select-Object -First 1
+          if ($null -eq $built) { throw 'Wails did not produce an NSIS installer' }
+          $setup = "nens-$version-windows-x64-setup.exe"
+          Copy-Item $built.FullName "build/bin/$setup"
+          $hash = (Get-FileHash -Algorithm SHA256 "build/bin/$setup").Hash.ToLower()
+          "$hash  $setup" | Set-Content "build/bin/checksums.txt" -Encoding ascii
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Nens ${{ github.ref_name }}
+          body: |
+            Windows x64 installer. The app checks this feed from Settings → Updates.
+
+            Nothing here is signed: SmartScreen will warn on first run until a
+            code-signing certificate exists.
+          files: |
+            build/bin/nens-*-windows-x64-setup.exe
+            build/bin/checksums.txt

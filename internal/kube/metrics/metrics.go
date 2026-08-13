@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"nens-k8s/internal/domain"
 	"nens-k8s/internal/kube/cluster"
@@ -59,6 +60,8 @@ func (r *Reader) Sample(ctx context.Context, clusterID string) (domain.MetricsSa
 // so the reason travels in the sample and every view renders "—" instead of an
 // error banner it can do nothing about.
 func unavailable(clusterID string, err error) domain.MetricsSample {
+	slog.Debug("metrics unavailable", "cluster", clusterID, "error", err)
+
 	return domain.MetricsSample{
 		ClusterID: clusterID,
 		Error:     reason(err),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -69,6 +70,7 @@ func (s *Store) Subscribe(token string, clusterID string, gvr domain.GVR, namesp
 	w.addToken(token)
 	s.mu.Unlock()
 
+	slog.Debug("subscribed", "token", token, "cluster", clusterID, "resource", gvr.Resource, "namespace", namespace)
 	w.publishSnapshot(token)
 	return domain.Subscription{Token: token, ClusterID: clusterID, GVR: gvr, Namespace: namespace}, nil
 }
@@ -82,6 +84,7 @@ func (s *Store) Unsubscribe(token string) error {
 		return nil
 	}
 	delete(s.tokens, token)
+	slog.Debug("unsubscribed", "token", token, "cluster", key.cluster, "resource", key.gvr.Resource, "namespace", key.namespace)
 
 	w, ok := s.watches[key]
 	if !ok || !w.removeToken(token) {
@@ -103,14 +106,17 @@ func (s *Store) start(conn *cluster.Connection, key target) *watch {
 	).Informer()
 
 	ctx, cancel := context.WithCancel(conn.Context())
-	w := newWatch(s.bus, informer, cancel)
+	log := slog.With("cluster", key.cluster, "resource", key.gvr.Resource, "namespace", key.namespace)
+	w := newWatch(s.bus, informer, cancel, log)
 
+	log.Info("informer started")
 	go informer.Run(ctx.Done())
 	go func() {
 		if cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 			w.markSynced()
 		}
 		<-ctx.Done()
+		log.Info("informer stopped")
 		s.drop(key, w)
 	}()
 

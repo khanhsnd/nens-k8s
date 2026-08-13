@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"path/filepath"
@@ -30,20 +31,28 @@ type Store struct {
 	data data
 }
 
-func NewStore() *Store {
+func Dir() (string, error) {
 	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("no writable config directory: %w", err)
+	}
+	return filepath.Join(base, appDir), nil
+}
+
+func NewStore() *Store {
+	dir, err := Dir()
 	if err != nil {
 		return &Store{err: err}
 	}
 
-	store := &Store{dir: filepath.Join(base, appDir)}
+	store := &Store{dir: dir}
 	store.read()
 	return store
 }
 
 func (s *Store) Dir() (string, error) {
 	if s.dir == "" {
-		return "", fmt.Errorf("no writable config directory: %w", s.err)
+		return "", s.err
 	}
 	return s.dir, nil
 }
@@ -117,11 +126,15 @@ func (s *Store) SetForwards(specs []domain.ForwardSpec) error {
 }
 
 func (s *Store) read() {
-	raw, err := os.ReadFile(filepath.Join(s.dir, fileName))
+	path := filepath.Join(s.dir, fileName)
+
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
-	_ = json.Unmarshal(raw, &s.data)
+	if err := json.Unmarshal(raw, &s.data); err != nil {
+		slog.Warn("settings file ignored", "path", path, "error", err)
+	}
 }
 
 func (s *Store) write() error {

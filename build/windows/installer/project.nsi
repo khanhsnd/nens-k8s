@@ -32,6 +32,10 @@ Unicode true
 ####
 ## Include the wails tools
 ####
+## The built binary is `nens.exe` (wails.json's outputfilename), not
+## `${INFO_PROJECTNAME}.exe` — without this the installer would rename it.
+!define PRODUCT_EXECUTABLE "nens.exe"
+
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts
@@ -76,10 +80,10 @@ OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the inst
   !if "${WAILS_INSTALL_SCOPE}" == "user"
     InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}"
   !else
-    InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}"
+    InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"
   !endif
 !else
-  InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}"
+  InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"
 !endif # Default installing folder ($PROGRAMFILES is Program Files folder).
 ShowInstDetails show # This will always show the installation details.
 

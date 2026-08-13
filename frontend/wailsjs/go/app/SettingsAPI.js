@@ -13,3 +13,7 @@ export function Fonts() {
 export function Reveal(arg1) {
   return window['go']['app']['SettingsAPI']['Reveal'](arg1);
 }
+
+export function Version() {
+  return window['go']['app']['SettingsAPI']['Version']();
+}

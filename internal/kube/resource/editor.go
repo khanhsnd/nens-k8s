@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 
 	"nens-k8s/internal/domain"
@@ -56,7 +57,7 @@ func (e *Editor) Apply(ctx context.Context, ref domain.ResourceRef, object map[s
 		FieldManager: fieldManager,
 		Force:        true,
 	})
-	if err != nil {
+	if err := audit("apply", ref, err); err != nil {
 		return nil, err
 	}
 	return trim(applied), nil
@@ -67,7 +68,7 @@ func (e *Editor) Delete(ctx context.Context, ref domain.ResourceRef) error {
 	if err != nil {
 		return err
 	}
-	return client.Delete(ctx, ref.Name, metav1.DeleteOptions{})
+	return audit("delete", ref, client.Delete(ctx, ref.Name, metav1.DeleteOptions{}))
 }
 
 func (e *Editor) Scale(ctx context.Context, ref domain.ResourceRef, replicas int32) error {
@@ -80,7 +81,7 @@ func (e *Editor) Scale(ctx context.Context, ref domain.ResourceRef, replicas int
 	_, err = client.Patch(ctx, ref.Name, types.MergePatchType, patch, metav1.PatchOptions{
 		FieldManager: fieldManager,
 	}, "scale")
-	return err
+	return audit("scale", ref, err, "replicas", replicas)
 }
 
 func (e *Editor) Owners(ctx context.Context, ref domain.ResourceRef) ([]domain.OwnerRef, error) {
@@ -156,6 +157,22 @@ func (e *Editor) Events(ctx context.Context, ref domain.ResourceRef) ([]domain.E
 	}
 	sort.Slice(records, func(a, b int) bool { return records[a].Last > records[b].Last })
 	return records, nil
+}
+
+func audit(verb string, ref domain.ResourceRef, err error, attrs ...any) error {
+	log := slog.With(append([]any{
+		"cluster", ref.ClusterID,
+		"resource", ref.GVR.Resource,
+		"namespace", ref.Namespace,
+		"name", ref.Name,
+	}, attrs...)...)
+
+	if err != nil {
+		log.Error(verb+" failed", "error", err)
+		return err
+	}
+	log.Info(verb + " ok")
+	return nil
 }
 
 func (e *Editor) client(ref domain.ResourceRef) (dynamic.ResourceInterface, *cluster.Connection, error) {

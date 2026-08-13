@@ -17,6 +17,7 @@ import (
 	"nens-k8s/internal/kube/metrics"
 	"nens-k8s/internal/kube/pods"
 	"nens-k8s/internal/kube/resource"
+	"nens-k8s/internal/update"
 )
 
 type App struct {
@@ -33,11 +34,12 @@ type App struct {
 	forwards    *PortForwardAPI
 	helm        *HelmAPI
 	settings    *SettingsAPI
+	updates     *UpdateAPI
 
 	ctx context.Context
 }
 
-func New() *App {
+func New(version string) *App {
 	bus := event.NewBus()
 	store := config.NewStore()
 	loader := kubeconfig.NewLoader(store)
@@ -55,7 +57,8 @@ func New() *App {
 		shells:      NewExecAPI(exec.NewRunner(registry, bus)),
 		forwards:    NewPortForwardAPI(forward.NewRegistry(registry, bus, store)),
 		helm:        NewHelmAPI(helm.NewClient(registry)),
-		settings:    NewSettingsAPI(store, fonts.NewSource()),
+		settings:    NewSettingsAPI(store, fonts.NewSource(), version),
+		updates:     NewUpdateAPI(update.NewFeed(version)),
 	}
 }
 
@@ -72,6 +75,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.shells.bind(ctx)
 	a.forwards.bind(ctx)
 	a.settings.bind(ctx)
+	a.updates.bind(ctx)
 }
 
 func (a *App) Shutdown(_ context.Context) {
@@ -91,5 +95,6 @@ func (a *App) Bindings() []any {
 		a.forwards,
 		a.helm,
 		a.settings,
+		a.updates,
 	}
 }

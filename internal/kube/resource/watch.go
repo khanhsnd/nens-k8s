@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ type watch struct {
 	bus      domain.Publisher
 	informer cache.SharedIndexInformer
 	cancel   context.CancelFunc
+	log      *slog.Logger
 
 	mu      sync.Mutex
 	tokens  map[string]bool
@@ -34,21 +36,26 @@ type watch struct {
 	synced  bool
 }
 
-func newWatch(bus domain.Publisher, informer cache.SharedIndexInformer, cancel context.CancelFunc) *watch {
+func newWatch(bus domain.Publisher, informer cache.SharedIndexInformer, cancel context.CancelFunc, log *slog.Logger) *watch {
 	w := &watch{
 		bus:      bus,
 		informer: informer,
 		cancel:   cancel,
+		log:      log,
 		tokens:   make(map[string]bool),
 		pending:  make(map[string]delta),
 	}
 
-	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { w.enqueue(domain.EventAdded, obj) },
 		UpdateFunc: func(_, obj any) { w.enqueue(domain.EventModified, obj) },
 		DeleteFunc: func(obj any) { w.enqueue(domain.EventDeleted, obj) },
-	})
-	_ = informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) { w.publishError(err) })
+	}); err != nil {
+		log.Error("informer handler not registered", "error", err)
+	}
+	if err := informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) { w.publishError(err) }); err != nil {
+		log.Warn("watch error handler not registered", "error", err)
+	}
 
 	return w
 }
@@ -111,6 +118,7 @@ func (w *watch) publishError(err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.log.Warn("watch error", "error", err)
 	w.broadcastLocked(domain.ResourceBatch{
 		Synced: w.synced,
 		Error:  err.Error(),

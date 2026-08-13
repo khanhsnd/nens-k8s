@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -118,6 +119,10 @@ func (r *Runner) start(
 	r.sessions[token] = current
 	r.mu.Unlock()
 
+	slog.Info("exec session started",
+		"token", token, "namespace", target.Namespace,
+		"pod", target.Pod, "container", target.Container, "command", command(opts))
+
 	go r.run(ctx, token, stream, current, keys, opts)
 	return nil
 }
@@ -141,6 +146,11 @@ func (r *Runner) run(
 	})
 	if ctx.Err() != nil {
 		err = nil
+	}
+	if err != nil {
+		slog.Warn("exec session failed", "token", token, "error", err)
+	} else {
+		slog.Debug("exec session ended", "token", token)
 	}
 
 	r.close(token)

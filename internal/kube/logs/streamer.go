@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 
 	"nens-k8s/internal/domain"
@@ -59,6 +60,10 @@ func (s *Streamer) Start(token string, clusterID string, target domain.Container
 		Pods(target.Namespace).
 		GetLogs(target.Pod, logOptions(target.Container, opts))
 
+	slog.Info("log stream started",
+		"token", token, "cluster", clusterID,
+		"namespace", target.Namespace, "pod", target.Pod, "container", target.Container)
+
 	go s.run(ctx, token, request)
 	return nil
 }
@@ -78,6 +83,12 @@ func (s *Streamer) Stop(token string) error {
 func (s *Streamer) run(ctx context.Context, token string, request *rest.Request) {
 	out := newSink(s.bus, token)
 	err := copyLines(ctx, request, out)
+
+	if err != nil {
+		slog.Warn("log stream failed", "token", token, "error", err)
+	} else {
+		slog.Debug("log stream ended", "token", token)
+	}
 
 	_ = s.Stop(token)
 	out.close(err)

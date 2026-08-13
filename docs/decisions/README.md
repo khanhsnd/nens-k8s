@@ -19,4 +19,6 @@ especially when the obvious alternative is wrong.
 | [portforward.md](portforward.md) | The forward registry, its view and its persistence |
 | [helm.md](helm.md) | Releases, revisions, the values diff, rollback and uninstall |
 | [settings.md](settings.md) | What is stored where, appearance, fonts, remembered state |
+| [logging.md](logging.md) | `nens.log`: what is written, where it rolls, what is never in it |
+| [packaging.md](packaging.md) | The version's one source, the installer, updates, signing |
 | [testing.md](testing.md) | What the tests run against, and what they must never touch |

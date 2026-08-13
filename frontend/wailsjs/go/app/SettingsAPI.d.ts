@@ -6,3 +6,5 @@ export function Dir():Promise<string>;
 export function Fonts():Promise<Array<string>>;
 
 export function Reveal(arg1:string):Promise<void>;
+
+export function Version():Promise<string>;

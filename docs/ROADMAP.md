@@ -151,13 +151,36 @@ and manifest diffs, rollback and uninstall — and against `client-go`'s fake cl
 through helm's own storage driver. `Rollback` and `Uninstall` have never run against a real
 API server; both go through helm's kube client, which a fake cannot stand in for.
 
-## Phase 9 — Production hardening
+## Phase 9 — Production hardening (done, except signing)
 
-- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`) — **started early**: `config.Store` already persists the kubeconfig source list, per-cluster display names and the port forwards to restore on connect. UI preferences (theme, appearance, panel sizes, grid layouts, namespace filter, open tabs, last cluster) live in `localStorage` through `shared/lib/persist.ts` — see `decisions/settings.md` for which side owns what.
-- Appearance is done: `SettingsAPI` (`Fonts`/`Dir`/`Reveal`) plus `features/settings` — installed-font picker for the UI and monospace families, and a text size that scales the whole type scale off one CSS variable.
-- Structured logging with `log/slog`, log file in the same dir.
-- Table tests for the registry, informer ref-counting, and the coalescer.
-- NSIS installer, code signing, auto-update feed.
+- Settings persistence (`internal/config`, JSON under `os.UserConfigDir`): `config.Store` persists the
+  kubeconfig source list, per-cluster display names and the port forwards to restore on connect. UI
+  preferences (theme, appearance, panel sizes, grid layouts, namespace filter, open tabs, last cluster)
+  live in `localStorage` through `shared/lib/persist.ts` — see `decisions/settings.md` for which side
+  owns what.
+- Appearance: `SettingsAPI` (`Fonts`/`Dir`/`Reveal`) plus `features/settings` — installed-font picker
+  for the UI and monospace families, and a text size that scales the whole type scale off one CSS
+  variable.
+- `internal/logging`: `log/slog` into `%AppData%/Nens/nens.log` beside `settings.json`, size-checked on
+  every write and rolled at 4 MiB with one previous file kept. Wails' own logger is bridged into it, so
+  the webview and the frontend's `ErrorBoundary` land in the same file. Adapters log lifecycle,
+  sessions and every write (apply/delete/scale, helm rollback/uninstall) — never per resource event.
+  See `decisions/logging.md`.
+- Tests: `cluster.Registry` over an `httptest` `/version` server, `resource.Store`'s informer
+  ref-counting, the coalescer's window and broadcast, `config.Store`'s round trip, and the update feed.
+- `internal/update` + `UpdateAPI`: the repository's `releases/latest`, a three-integer version
+  comparison, a SHA-256 check against the published `checksums.txt`, and the NSIS installer started
+  through the shell so it can elevate. Nothing polls; the check is Settings → Updates. `wails.json`'s
+  `info.productVersion` is the one place a version is written, embedded by `main.go` and stamped from
+  the tag by `.github/workflows/release.yml`. See `decisions/packaging.md`.
+- **Not done: code signing.** There is no certificate, so SmartScreen warns on a downloaded installer.
+  `decisions/packaging.md` names the exact `signtool` step and where it plugs into `project.nsi`.
+
+Exit: verified with `go test ./...`, the browser dev server (settings dialog, update section in both
+states, the error boundary and its fallback in both themes) and `wails generate module`, which runs the
+real binary — `nens.log` shows the startup, the webview bridge and a real connect. Never exercised: an
+actual GitHub release (none published yet), `startInstaller`, and the NSIS build itself, which needs
+`makensis` on PATH.
 
 ## Performance budget
 

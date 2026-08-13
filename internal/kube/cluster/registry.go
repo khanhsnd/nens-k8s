@@ -3,7 +3,9 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
+	"time"
 
 	"nens-k8s/internal/domain"
 	"nens-k8s/internal/event"
@@ -72,7 +74,9 @@ func (r *Registry) Connect(ctx context.Context, id string) (domain.Cluster, erro
 
 	meta.Phase = domain.PhaseConnecting
 	r.bus.Publish(event.TopicClusterChanged, meta)
+	slog.Info("cluster connecting", "cluster", id, "server", meta.Server)
 
+	started := time.Now()
 	config, err := r.source.RESTConfig(meta.Context)
 	if err != nil {
 		return r.fail(meta, err)
@@ -87,6 +91,7 @@ func (r *Registry) Connect(ctx context.Context, id string) (domain.Cluster, erro
 	r.conns[id] = conn
 	r.mu.Unlock()
 
+	slog.Info("cluster connected", "cluster", id, "version", conn.Meta().Version, "took", time.Since(started))
 	r.bus.Publish(event.TopicClusterChanged, conn.Meta())
 	return conn.Meta(), nil
 }
@@ -105,6 +110,7 @@ func (r *Registry) Disconnect(id string) error {
 	meta := conn.Meta()
 	meta.Phase = domain.PhaseDisconnected
 	meta.Version = ""
+	slog.Info("cluster disconnected", "cluster", id)
 	r.bus.Publish(event.TopicClusterChanged, meta)
 	return nil
 }
@@ -134,6 +140,7 @@ func (r *Registry) Shutdown() {
 	r.conns = make(map[string]*Connection)
 	r.mu.Unlock()
 
+	slog.Info("closing cluster connections", "count", len(conns))
 	for _, conn := range conns {
 		conn.Close()
 	}
@@ -155,6 +162,7 @@ func (r *Registry) lookup(id string) (domain.Cluster, error) {
 func (r *Registry) fail(meta domain.Cluster, err error) (domain.Cluster, error) {
 	meta.Phase = domain.PhaseError
 	meta.Error = err.Error()
+	slog.Error("cluster connection failed", "cluster", meta.ID, "server", meta.Server, "error", err)
 	r.bus.Publish(event.TopicClusterChanged, meta)
 	return meta, err
 }

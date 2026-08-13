@@ -2,6 +2,7 @@ package helm
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"time"
 
@@ -102,7 +103,7 @@ func (c *Client) Rollback(ref domain.HelmRef, revision int) error {
 
 	rollback := action.NewRollback(cfg)
 	rollback.Version = revision
-	return rollback.Run(ref.Name)
+	return audit("rollback", ref, rollback.Run(ref.Name), "revision", revision)
 }
 
 func (c *Client) Uninstall(ref domain.HelmRef) error {
@@ -115,7 +116,22 @@ func (c *Client) Uninstall(ref domain.HelmRef) error {
 	uninstall.DeletionPropagation = "background"
 
 	_, err = uninstall.Run(ref.Name)
-	return err
+	return audit("uninstall", ref, err)
+}
+
+func audit(verb string, ref domain.HelmRef, err error, attrs ...any) error {
+	log := slog.With(append([]any{
+		"cluster", ref.ClusterID,
+		"namespace", ref.Namespace,
+		"release", ref.Name,
+	}, attrs...)...)
+
+	if err != nil {
+		log.Error(verb+" failed", "error", err)
+		return err
+	}
+	log.Info(verb + " ok")
+	return nil
 }
 
 // config builds helm's world from the connection instead of letting helm dial
@@ -136,7 +152,9 @@ func (c *Client) config(clusterID string, namespace string) (*action.Configurati
 		RESTClientGetter: target,
 		KubeClient:       kube.New(target),
 		Releases:         storage.Init(driver.NewSecrets(conn.Clientset().CoreV1().Secrets(namespace))),
-		Log:              func(string, ...any) {},
+		Log: func(format string, args ...any) {
+			slog.Debug(fmt.Sprintf(format, args...), "source", "helm", "cluster", clusterID)
+		},
 	}, nil
 }
 

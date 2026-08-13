@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -110,7 +111,11 @@ func (c *Cache) build(ctx context.Context, clusterID string) ([]domain.APIResour
 	// partial answer is kept rather than discarded.
 	lists, err := conn.Discovery().ServerPreferredResources()
 	if len(lists) == 0 && err != nil {
+		slog.Error("discovery failed", "cluster", clusterID, "error", err)
 		return nil, err
+	}
+	if err != nil {
+		slog.Warn("discovery is partial", "cluster", clusterID, "error", err)
 	}
 
 	resources := collect(lists, printerColumns(ctx, conn))
@@ -206,6 +211,7 @@ func watchable(verbs []string) bool {
 func printerColumns(ctx context.Context, conn *cluster.Connection) map[schema.GroupVersionResource][]domain.PrinterColumn {
 	list, err := conn.Dynamic().Resource(crdGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
+		slog.Debug("printer columns unavailable", "error", err)
 		return nil
 	}
 

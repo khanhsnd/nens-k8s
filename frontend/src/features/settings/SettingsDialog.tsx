@@ -1,5 +1,6 @@
 import { FolderOpen, RotateCcw, X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
+import { UpdateSection } from '@/features/updates/UpdateSection'
 import { Dialog } from '@/shared/ui/Dialog'
 import { SIZES, useAppearance } from './appearance.store'
 import { configDir, revealPath } from './settings.api'
@@ -131,6 +132,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+
+      <UpdateSection />
     </Dialog>
   )
 }

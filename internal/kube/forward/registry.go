@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"sort"
@@ -121,6 +122,9 @@ func (r *Registry) Start(
 	r.mu.Unlock()
 
 	r.remember(spec)
+	slog.Info("forward started",
+		"id", meta.ID, "cluster", ref.ClusterID, "namespace", ref.Namespace,
+		"pod", pod, "local", localPort, "remote", remotePort)
 
 	go r.serve(meta.ID, entry, pipe)
 	go r.activate(meta.ID, entry, pipe, ready)
@@ -191,11 +195,15 @@ func (r *Registry) live(spec domain.ForwardSpec) bool {
 
 func (r *Registry) remember(spec domain.ForwardSpec) {
 	kept := slices.DeleteFunc(r.store.Forwards(), spec.SameTunnel)
-	_ = r.store.SetForwards(append(kept, spec))
+	if err := r.store.SetForwards(append(kept, spec)); err != nil {
+		slog.Warn("forward not remembered", "name", spec.Ref.Name, "error", err)
+	}
 }
 
 func (r *Registry) forget(spec domain.ForwardSpec) {
-	_ = r.store.SetForwards(slices.DeleteFunc(r.store.Forwards(), spec.SameTunnel))
+	if err := r.store.SetForwards(slices.DeleteFunc(r.store.Forwards(), spec.SameTunnel)); err != nil {
+		slog.Warn("forward not forgotten", "name", spec.Ref.Name, "error", err)
+	}
 }
 
 func (r *Registry) serve(id string, entry *forward, pipe tunnel) {
@@ -259,6 +267,12 @@ func (r *Registry) finish(id string, entry *forward, err error) {
 
 	if !live {
 		return
+	}
+
+	if err != nil {
+		slog.Warn("forward failed", "id", id, "error", err)
+	} else {
+		slog.Info("forward stopped", "id", id)
 	}
 
 	entry.once.Do(func() { close(entry.stop) })

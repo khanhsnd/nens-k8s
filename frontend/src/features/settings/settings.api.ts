@@ -1,4 +1,4 @@
-import { Dir, Fonts, Reveal } from '@bindings/go/app/SettingsAPI'
+import { Dir, Fonts, Reveal, Version } from '@bindings/go/app/SettingsAPI'
 import { useClusters } from '@/features/clusters/cluster.store'
 
 const offline = () => useClusters.getState().offline
@@ -34,6 +34,15 @@ export async function configDir(): Promise<string> {
     return await Dir()
   } catch {
     return ''
+  }
+}
+
+/** What wails.json calls the product version; `dev` when there is no bridge. */
+export async function appVersion(): Promise<string> {
+  try {
+    return await Version()
+  } catch {
+    return 'dev'
   }
 }
 

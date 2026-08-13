@@ -2,6 +2,8 @@ package resource
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -69,7 +71,7 @@ func startWatch(t *testing.T, objects ...runtime.Object) (*recorder, *watch, *dy
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	w := newWatch(bus, informer, cancel)
+	w := newWatch(bus, informer, cancel, slog.Default())
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		t.Fatal("informer cache never synced")
@@ -148,6 +150,101 @@ func TestEventsAreDroppedWithoutSubscribers(t *testing.T) {
 	case batch := <-bus.batches:
 		t.Fatalf("published %+v with no subscribers", batch)
 	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func revised(name string, version string) *unstructured.Unstructured {
+	object := pod(name)
+	object.SetResourceVersion(version)
+	return object
+}
+
+func TestRepeatedDeltasForOneObjectCollapseToTheLatest(t *testing.T) {
+	bus, w, _ := startWatch(t)
+
+	w.addToken("token-1")
+	w.enqueue(domain.EventAdded, revised("alpha", "1"))
+	w.enqueue(domain.EventModified, revised("alpha", "2"))
+	w.enqueue(domain.EventModified, revised("alpha", "3"))
+
+	batch := bus.next(t)
+	if len(batch.Events) != 1 {
+		t.Fatalf("events = %+v, want one per object", batch.Events)
+	}
+	if batch.Events[0].Type != domain.EventModified {
+		t.Errorf("type = %q, want the last one to win", batch.Events[0].Type)
+	}
+
+	metadata := batch.Events[0].Object["metadata"].(map[string]any)
+	if metadata["resourceVersion"] != "3" {
+		t.Errorf("resourceVersion = %v, want the newest object", metadata["resourceVersion"])
+	}
+}
+
+func TestTheWindowReopensAfterAFlush(t *testing.T) {
+	bus, w, _ := startWatch(t)
+
+	w.addToken("token-1")
+	w.enqueue(domain.EventAdded, pod("alpha"))
+	if first := bus.next(t); len(first.Events) != 1 {
+		t.Fatalf("first batch = %+v", first.Events)
+	}
+
+	w.enqueue(domain.EventAdded, pod("beta"))
+	if second := bus.next(t); len(second.Events) != 1 {
+		t.Fatalf("second batch = %+v", second.Events)
+	}
+}
+
+func TestEverySubscriberGetsItsOwnBatch(t *testing.T) {
+	bus, w, _ := startWatch(t)
+
+	w.addToken("token-1")
+	w.addToken("token-2")
+	w.enqueue(domain.EventAdded, pod("alpha"))
+
+	events := map[string]int{}
+	for range 2 {
+		batch := bus.next(t)
+		events[batch.Token] = len(batch.Events)
+	}
+	if events["token-1"] != 1 || events["token-2"] != 1 {
+		t.Errorf("batches = %+v, want one carrying the pod for each token", events)
+	}
+}
+
+func TestSyncIsAnnouncedWithoutReplayingTheCache(t *testing.T) {
+	bus, w, _ := startWatch(t, pod("alpha"))
+
+	w.addToken("token-1")
+	w.markSynced()
+
+	batch := bus.next(t)
+	if !batch.Synced || batch.Reset || len(batch.Events) != 0 {
+		t.Fatalf("sync batch = %+v, want the flag alone", batch)
+	}
+
+	w.addToken("token-2")
+	w.publishSnapshot("token-2")
+
+	snapshot := bus.next(t)
+	if !snapshot.Synced || !snapshot.Reset || len(snapshot.Events) != 1 {
+		t.Errorf("snapshot = %+v, want a synced reset carrying the pod", snapshot)
+	}
+}
+
+func TestWatchErrorsReachEverySubscriber(t *testing.T) {
+	bus, w, _ := startWatch(t)
+
+	w.addToken("token-1")
+	w.addToken("token-2")
+	w.publishError(errors.New("connection refused"))
+
+	for range 2 {
+		batch := bus.next(t)
+		if batch.Error == "" || len(batch.Events) != 0 {
+			t.Errorf("batch = %+v, want the error and no events", batch)
+		}
 	}
 }
 

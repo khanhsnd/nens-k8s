@@ -505,6 +505,26 @@ export namespace domain {
 		    return a;
 		}
 	}
+	export class UpdateStatus {
+	    current: string;
+	    latest: string;
+	    available: boolean;
+	    page: string;
+	    development: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.current = source["current"];
+	        this.latest = source["latest"];
+	        this.available = source["available"];
+	        this.page = source["page"];
+	        this.development = source["development"];
+	    }
+	}
 
 }
 
