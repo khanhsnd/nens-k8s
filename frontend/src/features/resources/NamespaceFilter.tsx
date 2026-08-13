@@ -1,5 +1,5 @@
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { useMemo, useRef, useState, type RefObject } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { MenuCheck } from '@/shared/ui/MenuCheck'
@@ -79,73 +79,105 @@ export function NamespaceFilter({
   }
 
   return (
-    <Menu.Root onOpenChange={(open) => open && setQuery('')}>
-      <Menu.Trigger
-        title="Filter by namespace"
-        className="flex w-48 shrink-0 items-center gap-1.5 rounded-md border border-line bg-base py-1.5 pl-2.5 pr-2 text-sm outline-none transition-colors hover:border-line-strong focus:border-accent/60 data-[state=open]:border-accent/60"
-      >
-        <span className={cn('min-w-0 flex-1 truncate text-left', value.length === 0 && 'text-faint')}>
-          {summary(value)}
-        </span>
-        <ChevronDown className="size-3.5 shrink-0 text-faint" />
-      </Menu.Trigger>
-
-      <Menu.Portal>
-        <Menu.Content
-          align="start"
-          sideOffset={6}
-          // The menu focuses its own content — on open, and again when an item is
-          // ticked — and exposes no hook to redirect that, so the search box takes
-          // focus whenever the content itself receives it.
-          onFocus={(event) => {
-            if (event.target === event.currentTarget) search.current?.focus()
-          }}
-          className="z-50 w-64 rounded-md border border-line-strong bg-overlay p-1 text-sm shadow-xl"
+    <>
+      <Menu.Root onOpenChange={(open) => open && setQuery('')}>
+        <Menu.Trigger
+          title="Filter by namespace"
+          className="flex w-40 shrink-0 items-center gap-1.5 rounded-md border border-line bg-base py-1.5 pl-2.5 pr-2 text-sm outline-none transition-colors hover:border-line-strong focus:border-accent/60 data-[state=open]:border-accent/60"
         >
-          <Search
-            inputRef={search}
-            query={query}
-            onQuery={setQuery}
-            onEnter={() => visible[0] && toggle(visible[0])}
-          />
+          <span
+            className={cn('min-w-0 flex-1 truncate text-left', value.length === 0 && 'text-faint')}
+          >
+            {summary(value)}
+          </span>
+          <ChevronDown className="size-3.5 shrink-0 text-faint" />
+        </Menu.Trigger>
 
-          <div className="max-h-64 overflow-y-auto">
-            {visible.length === 0 && (
-              <div className="px-2 py-1.5 text-xs text-faint">No namespace matches</div>
+        <Menu.Portal>
+          <Menu.Content
+            align="start"
+            sideOffset={6}
+            // The menu focuses its own content — on open, and again when an item is
+            // ticked — and exposes no hook to redirect that, so the search box takes
+            // focus whenever the content itself receives it.
+            onFocus={(event) => {
+              if (event.target === event.currentTarget) search.current?.focus()
+            }}
+            className="z-50 w-64 rounded-md border border-line-strong bg-overlay p-1 text-sm shadow-xl"
+          >
+            <Search
+              inputRef={search}
+              query={query}
+              onQuery={setQuery}
+              onEnter={() => visible[0] && toggle(visible[0])}
+            />
+
+            <div className="max-h-64 overflow-y-auto">
+              {visible.length === 0 && (
+                <div className="px-2 py-1.5 text-xs text-faint">No namespace matches</div>
+              )}
+
+              {visible.map((namespace) => (
+                <Menu.CheckboxItem
+                  key={namespace}
+                  checked={value.includes(namespace)}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    toggle(namespace)
+                  }}
+                  className="flex cursor-default items-center gap-2 rounded px-2 py-1.5 text-muted outline-none data-[highlighted]:bg-raised data-[highlighted]:text-text"
+                >
+                  <MenuCheck />
+                  <span className="truncate">{namespace}</span>
+                </Menu.CheckboxItem>
+              ))}
+            </div>
+
+            {value.length > 0 && (
+              <>
+                <Menu.Separator className="my-1 h-px bg-line" />
+                <Menu.Item
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    onChange([])
+                  }}
+                  className="flex cursor-default items-center rounded px-2 py-1.5 pl-[26px] text-muted outline-none data-[highlighted]:bg-raised data-[highlighted]:text-text"
+                >
+                  All namespaces
+                </Menu.Item>
+              </>
             )}
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu.Root>
 
-            {visible.map((namespace) => (
-              <Menu.CheckboxItem
-                key={namespace}
-                checked={value.includes(namespace)}
-                onSelect={(event) => {
-                  event.preventDefault()
-                  toggle(namespace)
-                }}
-                className="flex cursor-default items-center gap-2 rounded px-2 py-1.5 text-muted outline-none data-[highlighted]:bg-raised data-[highlighted]:text-text"
-              >
-                <MenuCheck />
-                <span className="truncate">{namespace}</span>
-              </Menu.CheckboxItem>
-            ))}
-          </div>
+      {/* The chips are the second half of the control: unticking through the menu
+          means opening it, finding the row and reading its checkbox — removing one
+          from here is one click on the thing being removed. */}
+      {value.length > 0 && (
+        <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+          {value.map((namespace) => (
+            <button
+              key={namespace}
+              onClick={() => onChange(value.filter((item) => item !== namespace))}
+              title={`Stop filtering by ${namespace}`}
+              className="flex h-6 shrink-0 items-center gap-1 rounded-full border border-accent/40 bg-accent-dim pl-2 pr-1 text-xs text-accent transition-colors hover:border-danger/50 hover:bg-danger/10 hover:text-danger"
+            >
+              <span className="max-w-40 truncate">{namespace}</span>
+              <X className="size-3 shrink-0" />
+            </button>
+          ))}
 
-          {value.length > 0 && (
-            <>
-              <Menu.Separator className="my-1 h-px bg-line" />
-              <Menu.Item
-                onSelect={(event) => {
-                  event.preventDefault()
-                  onChange([])
-                }}
-                className="flex cursor-default items-center rounded px-2 py-1.5 pl-[26px] text-muted outline-none data-[highlighted]:bg-raised data-[highlighted]:text-text"
-              >
-                All namespaces
-              </Menu.Item>
-            </>
+          {value.length > 1 && (
+            <button
+              onClick={() => onChange([])}
+              className="shrink-0 rounded px-1.5 text-xs text-faint transition-colors hover:text-text"
+            >
+              Clear
+            </button>
           )}
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu.Root>
+        </div>
+      )}
+    </>
   )
 }

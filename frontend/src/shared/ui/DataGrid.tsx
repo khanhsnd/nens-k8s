@@ -3,6 +3,7 @@ import { MoreHorizontal } from 'lucide-react'
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -28,9 +29,39 @@ export type Column<T> = {
 const ROW_HEIGHT = 30
 const ACTIONS_WIDTH = 36
 const ROW_ACTIONS_WIDTH = 76
+const CHECK_WIDTH = 32
+/** Under this much pointer movement a press is a click, not a range drag. */
+const CLICK_SLOP = 4
 const AUTOSCROLL_EDGE = 28
 const AUTOSCROLL_SPEED = 12
 const REORDER_THRESHOLD = 6
+
+function Tick({
+  checked,
+  partial,
+  title,
+  onChange,
+}: {
+  checked: boolean
+  partial?: boolean
+  title: string
+  onChange: () => void
+}) {
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      title={title}
+      // `indeterminate` is a property, never an attribute.
+      ref={(node) => {
+        if (node) node.indeterminate = Boolean(partial) && !checked
+      }}
+      onChange={onChange}
+      onPointerDown={(event) => event.stopPropagation()}
+      className="size-3.5 cursor-pointer accent-accent"
+    />
+  )
+}
 
 function edgeShadow(r: number, c: number, rect: Rect, focused: boolean): string | undefined {
   const shadows = [
@@ -43,6 +74,12 @@ function edgeShadow(r: number, c: number, rect: Rect, focused: boolean): string 
   return shadows.length > 0 ? shadows.join(', ') : undefined
 }
 
+/** Tick boxes for a bulk action: the view owns what the action is. */
+export type GridPicks = {
+  keys: Set<string>
+  onChange: (keys: Set<string>) => void
+}
+
 export function DataGrid<T>({
   layoutId,
   rows,
@@ -51,6 +88,7 @@ export function DataGrid<T>({
   activeKey,
   onActivate,
   rowActions,
+  picks,
 }: {
   layoutId: string
   rows: T[]
@@ -60,8 +98,10 @@ export function DataGrid<T>({
   onActivate?: (row: T) => void
   /** Fills the sticky last cell instead of the open-details button. */
   rowActions?: (row: T) => ReactNode
+  picks?: GridPicks
 }) {
   const actionsWidth = rowActions ? ROW_ACTIONS_WIDTH : ACTIONS_WIDTH
+  const checkWidth = picks ? CHECK_WIDTH : 0
   const scrollRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const pointer = useRef({ x: 0, y: 0 })
@@ -80,7 +120,21 @@ export function DataGrid<T>({
   }
 
   const template = visible.map(trackOf).join(' ')
+  // Columns only: the tick and actions tracks are added where the whole row is
+  // measured, and the header's track area must not count them.
   const columnsWidth = visible.reduce((total, column) => total + (widthOf(column) || column.min), 0)
+  const rowWidth = checkWidth + columnsWidth + actionsWidth
+
+  const pickedHere = picks ? rows.filter((row) => picks.keys.has(rowKey(row))).length : 0
+  const allPicked = pickedHere > 0 && pickedHere === rows.length
+
+  const togglePick = (key: string) => {
+    if (!picks) return
+
+    const next = new Set(picks.keys)
+    if (!next.delete(key)) next.add(key)
+    picks.onChange(next)
+  }
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -195,7 +249,37 @@ export function DataGrid<T>({
     endDrag.current = stop
   }, [cellAtPointer, extendTo])
 
+  /**
+   * A press that does not travel is a click: it selects the cell, tints the row
+   * and opens the detail panel. Waiting for the release is what keeps the range
+   * drag — the panel must not open under a pointer that is still selecting.
+   */
+  const armActivate = useCallback(
+    (row: T) => {
+      if (!onActivate) return
+
+      const from = { ...pointer.current }
+      const onUp = (up: PointerEvent) => {
+        window.removeEventListener('pointerup', onUp)
+        const travelled = Math.abs(up.clientX - from.x) + Math.abs(up.clientY - from.y)
+        if (travelled < CLICK_SLOP) onActivate(row)
+      }
+      window.addEventListener('pointerup', onUp)
+    },
+    [onActivate],
+  )
+
   useEffect(() => () => endDrag.current(), [])
+
+  // The header's offset is imperative — a scroll must not re-render 5k rows — so
+  // it has to be re-applied after every render: a render that replaces the header
+  // node (or its style) leaves a scrolled body under an unscrolled header.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller && headerRef.current) {
+      headerRef.current.style.transform = `translateX(${-scroller.scrollLeft}px)`
+    }
+  })
 
   const selectedRows = rect.bottom - rect.top + 1
   const selectedCols = rect.right - rect.left + 1
@@ -203,6 +287,20 @@ export function DataGrid<T>({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-base">
       <div className="flex shrink-0 overflow-hidden border-b border-line bg-surface [scrollbar-gutter:stable]">
+        {picks && (
+          <div
+            style={{ width: checkWidth }}
+            className="grid shrink-0 place-items-center border-r border-line/60"
+          >
+            <Tick
+              checked={allPicked}
+              partial={pickedHere > 0}
+              title={allPicked ? 'Clear the selection' : 'Select every row in view'}
+              onChange={() => picks.onChange(allPicked ? new Set() : new Set(rows.map(rowKey)))}
+            />
+          </div>
+        )}
+
         <div className="min-w-0 flex-1 overflow-hidden">
           <div
             ref={headerRef}
@@ -268,35 +366,55 @@ export function DataGrid<T>({
         className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll outline-none [scrollbar-gutter:stable]"
       >
         <div
-          style={{ height: virtualizer.getTotalSize(), minWidth: columnsWidth + actionsWidth }}
+          style={{ height: virtualizer.getTotalSize(), minWidth: rowWidth }}
           className="relative"
         >
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]
             if (!row) return null
 
-            const background =
-              rowKey(row) === activeKey
-                ? 'bg-accent-dim'
-                : item.index >= rect.top && item.index <= rect.bottom
-                  ? 'bg-raised'
-                  : 'bg-base'
+            const key = rowKey(row)
+            const active = key === activeKey
+            const background = active
+              ? 'bg-accent-dim'
+              : item.index >= rect.top && item.index <= rect.bottom
+                ? 'bg-raised'
+                : 'bg-base'
 
             return (
               <div
-                key={rowKey(row)}
+                key={key}
                 role="row"
                 style={{
                   transform: `translateY(${item.start}px)`,
                   height: ROW_HEIGHT,
-                  gridTemplateColumns: `${template} ${actionsWidth}px`,
-                  minWidth: columnsWidth + actionsWidth,
+                  gridTemplateColumns: `${checkWidth ? `${checkWidth}px ` : ''}${template} ${actionsWidth}px`,
+                  minWidth: rowWidth,
                 }}
                 className={cn(
-                  'absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-sm',
+                  'group/row absolute inset-x-0 top-0 grid items-stretch border-b border-line/40 text-sm',
                   background,
+                  // The hover tint has to be the row's, not the cell's: a cell-level
+                  // hover would leave the sticky ends behind as the pointer moves.
+                  !active && 'hover:bg-raised',
                 )}
               >
+                {picks && (
+                  <div
+                    style={{ left: 0 }}
+                    className={cn(
+                      'sticky z-10 grid place-items-center border-r border-line/40',
+                      background,
+                      !active && 'group-hover/row:bg-raised',
+                    )}
+                  >
+                    <Tick
+                      checked={picks.keys.has(key)}
+                      title="Select this row"
+                      onChange={() => togglePick(key)}
+                    />
+                  </div>
+                )}
                 {visible.map((column, c) => {
                   const inRange =
                     item.index >= rect.top &&
@@ -318,8 +436,8 @@ export function DataGrid<T>({
                         pointer.current = { x: event.clientX, y: event.clientY }
                         goTo({ r: item.index, c }, event.shiftKey)
                         startDrag()
+                        if (!event.shiftKey) armActivate(row)
                       }}
-                      onDoubleClick={() => onActivate?.(row)}
                       style={{
                         boxShadow: inRange ? edgeShadow(item.index, c, rect, focused) : undefined,
                       }}
@@ -342,6 +460,7 @@ export function DataGrid<T>({
                   className={cn(
                     'sticky right-0 flex items-center justify-center gap-1 border-l border-line/40',
                     background,
+                    !active && 'group-hover/row:bg-raised',
                   )}
                 >
                   {rowActions
@@ -364,12 +483,13 @@ export function DataGrid<T>({
 
       <div className="flex shrink-0 items-center gap-3 border-t border-line bg-surface px-4 py-1.5 text-xs text-faint">
         <span>{rows.length} items</span>
+        {pickedHere > 0 && <span className="font-medium text-accent">{pickedHere} ticked</span>}
         {(selectedRows > 1 || selectedCols > 1) && (
           <span className="text-muted">
             {selectedRows}R × {selectedCols}C
           </span>
         )}
-        <span className="ml-auto">Drag to select · Ctrl+C copy · Enter open</span>
+        <span className="ml-auto">Click to open · Drag to select · Ctrl+C copy</span>
       </div>
     </div>
   )

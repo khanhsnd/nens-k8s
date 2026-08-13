@@ -60,6 +60,7 @@ type APIDiscovery interface {
 
 type MetricsSampler interface {
 	Sample(ctx context.Context, clusterID string) (MetricsSample, error)
+	PodSample(ctx context.Context, clusterID string, namespace string, name string) (PodUsage, error)
 }
 
 // HelmClient takes no context: helm's action API accepts none, and a parameter

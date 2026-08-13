@@ -9,6 +9,39 @@ the drawer's row keeps `bg-accent-dim` across its full width. Widening the rect 
 the whole row on click would make "select the row" literal at the cost of column-range
 drag, and would turn every `Ctrl+C` into a full-row copy.
 
+### A click opens the drawer; the range drag is what a press that travels means
+
+Opening used to need a double click or the row's ⋯ button, which is one interaction too many
+for the thing the table is for. `armActivate` listens for the matching `pointerup` and calls
+`onActivate` only if the pointer moved less than `CLICK_SLOP` — so a click selects the cell,
+opens the drawer and (through `activeKey`) tints the whole row, while a drag still selects a
+range and opens nothing. Shift-click extends the rect and never activates.
+
+`AppShell` therefore *sets* the selection instead of toggling it: with click-to-open, toggling
+would close the drawer again as soon as the user clicked a second cell of the same row.
+
+### The tick column is a `picks` prop, not a `Column`
+
+`DataGrid` takes `picks?: {keys, onChange}` and renders a 32px track before the columns —
+sticky at `left-0` in the rows and a fixed sibling cell in the header, the mirror of the
+actions cell on the right. Like that one it is deliberately *not* a `Column`: selection, copy
+and keyboard navigation are keyed by `columns.length` and must not see it, and the tick cell
+carries no `data-cell` so a range drag skips it.
+
+The header tick is select-all/clear over the rows in view. What the ticks *do* belongs to the
+view — `ResourceTable` owns the delete, because only it knows the cluster and the kind — and it
+intersects the ticked keys with the visible rows before acting, since rows can be deleted or
+filtered away under a tick.
+
+### The header's scroll offset is re-applied after every render
+
+`onScroll` writes `transform: translateX(-scrollLeft)` on the header imperatively, because a
+horizontal scroll must not re-render 5k rows. That offset is lost whenever a render replaces the
+header node, which leaves a scrolled body under an unscrolled header — a 400px column
+misalignment that looks like a layout bug and is really a stale style. A `useLayoutEffect` with
+no dependency array re-applies it from the live `scrollLeft` after every render: two DOM
+operations, and the two can no longer disagree.
+
 ### The row actions cell is the last grid column, not an overlay
 
 `DataGrid` appends a fixed track to the template and renders a `sticky right-0` cell

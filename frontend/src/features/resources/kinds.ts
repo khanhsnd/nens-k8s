@@ -26,6 +26,8 @@ export type KindSpec = {
   metrics?: boolean
   /** Owns pods with ports, so a local port can be forwarded to it. */
   forward?: boolean
+  /** Runs containers itself, so the drawer lists their spec and their state. */
+  containers?: boolean
 }
 
 /** A spec resolved against a cluster: the columns are always there. */
@@ -64,6 +66,7 @@ export const KINDS: Record<string, KindSpec> = {
     logs: true,
     shell: true,
     forward: true,
+    containers: true,
   },
   deployments: {
     gvr: at('apps', 'v1', 'deployments'),

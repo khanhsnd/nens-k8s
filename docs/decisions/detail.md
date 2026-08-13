@@ -63,6 +63,47 @@ is why the button only needs discovery to have named the Kind. It is also gated 
 verb discovery reported, which is what the *resource* supports, not what this user is allowed
 to do: RBAC is only ever answered by trying, and a Forbidden lands in the dialog.
 
+### Containers are a panel gated on a kind flag
+
+A pod's containers are the one thing the shared `Column[]` cannot carry: the columns describe one
+row, and a container list is a nested document. `ContainerPanel` follows `ForwardPanel` instead —
+`KindSpec.containers` turns it on, and only `pods` sets it. A workload's `spec.template` is
+deliberately not shown the same way: it has no `containerStatuses`, so half the panel would be
+empty, and the pods it owns already have one.
+
+The panel reads the informer's object, not a fresh `Get`: `trim` only drops managed fields, so the
+spec the table already holds carries env, mounts, probes and resources.
+
+### The drawer opts back into text selection
+
+`body` sets `user-select: none` — an app chrome that highlights on a double click looks broken,
+and the grid has its own cell selection. The drawer is the exception: it is all values someone
+wants to drag over and copy, so the `aside` sets `select-text` and the per-value copy buttons
+become a shortcut rather than the only way out.
+
+### Env is resolved the way the kubelet would, and a secret needs a click
+
+`features/resources/env.ts` answers "what will this container actually see": `envFrom` entries are
+expanded into their keys, `configMapKeyRef` and `secretKeyRef` are read, `fieldRef` and
+`resourceFieldRef` are evaluated against the pod in hand, and an explicit `env` of the same name
+drops the `envFrom` key it overrides — which is the order the kubelet applies them in. Printing
+the reference instead (`secret db-creds.password`) was the first cut and it is not an answer: the
+value is the thing being debugged.
+
+The reads go through the existing `ResourceAPI.Get`, one per referenced object per resolve, cached
+for that resolve only — a ConfigMap edited underneath should show its new value the next time the
+drawer opens. Nothing is cached longer, and nothing new was added to the port.
+
+A `Secret`-sourced value renders as dots until the eye is clicked, per variable. That is a
+deliberate middle: the value is one click away for whoever opened the drawer, and a screen share
+or a screenshot does not leak it by default. A read that fails keeps its reason and renders
+`not readable` rather than `not found` — RBAC that allows pods and forbids Secrets is common, and
+the two say very different things about the pod.
+
+The effect keys on a signature of `env` + `envFrom` rather than on the spec's identity: the informer
+hands out a new object on every update, and a busy pod would otherwise re-read its ConfigMaps and
+Secrets several times a second.
+
 ### The dirty guard is a store, not a prop
 
 `features/resources/editor.store.ts` holds `dirty` plus one `pending` action. Anything that would

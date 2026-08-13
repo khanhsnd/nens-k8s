@@ -32,10 +32,12 @@ export function DetailDrawer({
   const uid = object.metadata.uid
   const target = useMemo(() => refOf(clusterId, kind, object), [clusterId, kind, uid])
 
+  // `select-text` undoes the app-wide `user-select: none`: everything in the
+  // drawer is a value someone wants to drag over and copy with Ctrl+C.
   return (
     <aside
       style={{ width }}
-      className="relative flex max-w-[70vw] shrink-0 flex-col border-l border-line bg-surface"
+      className="relative flex max-w-[70vw] shrink-0 select-text flex-col border-l border-line bg-surface"
     >
       <Resizer edge="left" onResize={setWidth} />
 

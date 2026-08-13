@@ -2,6 +2,7 @@ import { CornerDownRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ForwardPanel } from '@/features/portforward/ForwardPanel'
 import { Field, Heading } from '@/shared/ui/Field'
+import { ContainerPanel } from './ContainerPanel'
 import type { Kind } from './kinds'
 import { listOwners } from './object.api'
 import type { K8sObject, OwnerRef, ResourceRef } from './resource.types'
@@ -81,6 +82,8 @@ export function ObjectOverview({
           </div>
         </div>
       )}
+
+      {kind.containers && <ContainerPanel pod={object} target={target} />}
     </div>
   )
 }

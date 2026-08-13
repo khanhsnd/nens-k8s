@@ -34,6 +34,9 @@ type TabState = {
   activate: (id: string) => void
   close: (id: string) => void
   closeOthers: (id: string) => void
+  /** Everything left or right of this tab; the tab itself stays. */
+  closeToSide: (id: string, side: 'left' | 'right') => void
+  closeAll: () => void
   cycle: (delta: number) => void
 }
 
@@ -78,6 +81,18 @@ export const useTabs = create<TabState>((set) => ({
 
   closeOthers: (id) =>
     set((state) => ({ tabs: state.tabs.filter((item) => item.id === id), activeId: id })),
+
+  closeToSide: (id, side) =>
+    set((state) => {
+      const index = state.tabs.findIndex((item) => item.id === id)
+      if (index < 0) return state
+
+      const tabs = side === 'left' ? state.tabs.slice(index) : state.tabs.slice(0, index + 1)
+      const kept = tabs.some((item) => item.id === state.activeId)
+      return { tabs, activeId: kept ? state.activeId : id }
+    }),
+
+  closeAll: () => set({ tabs: [], activeId: null }),
 
   cycle: (delta) =>
     set((state) => {

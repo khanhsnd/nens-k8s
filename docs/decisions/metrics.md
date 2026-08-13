@@ -21,6 +21,25 @@ open tab is the Overview or a kind that declares `metrics`, and `follow(null)` o
 5k-pod cluster the pod metrics list is megabytes, so polling it while the user is reading
 ConfigMaps is a cost with no reader.
 
+### One pod is a second, faster poll — and the chart is per sample, not per second
+
+The tables need every pod summed; the detail drawer needs one pod split by container. Those are
+different requests, so `MetricsSampler` has both: `Sample` lists the cluster, `PodSample` gets
+`metrics.k8s.io/v1beta1/namespaces/<ns>/pods/<name>`. Trimming the cluster-wide list down to one
+pod would have meant keeping per-container numbers for 5k pods to serve the one on screen, and
+polling that list every 10s — which is what the drawer wants — is megabytes a poll.
+`features/metrics/pod.usage.store.ts` owns that 10s cadence and stops when the drawer closes.
+
+metrics-server keeps no history, so the chart is the samples this session collected: 120 of them,
+plotted per sample rather than per second, with the container's request and limit as dashed lines.
+Two polls often carry the same `timestamp` — metrics-server resamples on its own cadence — and a
+repeat is dropped rather than appended, so the line never claims a resolution the data does not
+have. A Prometheus-backed hour of history, which is what Lens draws, would need a Prometheus
+adapter and a way to reach it; nothing here pretends to be one.
+
+The series is keyed by the pod it was sampled from and reset when another pod is selected: one
+frame of the previous pod's chart under a new pod's name is worse than an empty one.
+
 ### Missing metrics are an answer, not an error
 
 Most clusters this app will meet have metrics-server; plenty do not, and a few have one that is

@@ -11,8 +11,10 @@
   --color-line-strong: #c1cad7;
 
   --color-text: #1b2028;
-  --color-muted: #59636f;
-  --color-faint: #848f9e;
+  --color-muted: #4e5866;
+  /* Light needs a darker faint than it looks like it does: #848f9e reads at
+     ~3:1 on surface, which is under the 4.5:1 a label has to clear. */
+  --color-faint: #67717f;
 
   --color-accent: #0b6bcb;
   --color-accent-dim: #dbe8fb;
@@ -41,6 +43,18 @@
   --text-lg--line-height: 1.4;
 
   --radius-panel: 10px;
+
+  /* An indeterminate bar: nothing here knows how much of a sync is left. */
+  --animate-sweep: sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
 }
 
 :root {

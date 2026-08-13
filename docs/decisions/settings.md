@@ -102,3 +102,14 @@ leaf that no longer exists is dropped, so a saved tab can never outlive its nav 
 resource keeps the title it was opened with (see [discovery.md](discovery.md)). `cluster.store`
 restores the selection the same way but never calls `Connect`: connecting is the user's decision, and
 the tree looks the same either way.
+
+### The light palette's `faint` had to get darker
+
+`--color-faint` was `#848f9e`, which is ~3:1 on `surface` — under the 4.5:1 a label needs, and
+it is the token every section heading, field label and hint uses. Light theme was the one that
+suffered: the same token on the dark palette sits on a near-black ground and reads fine. It is
+now `#67717f` (and `muted` `#4e5866`), with headings at `font-semibold` and field rows carrying
+a divider, because contrast alone does not make a stack of 20 fields scannable.
+
+The dark palette is deliberately unchanged: it already cleared the ratio, and moving both would
+have been a redesign rather than a fix.

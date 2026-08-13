@@ -56,6 +56,40 @@ func (r *Reader) Sample(ctx context.Context, clusterID string) (domain.MetricsSa
 	}, nil
 }
 
+// PodSample reads one pod's metrics, container by container. It is a Get rather
+// than a filtered list because the detail drawer polls it faster than the tables
+// poll the cluster — on a 5k-pod cluster that list is megabytes.
+func (r *Reader) PodSample(ctx context.Context, clusterID string, namespace string, name string) (domain.PodUsage, error) {
+	conn, ok := r.clusters.Connection(clusterID)
+	if !ok {
+		return domain.PodUsage{}, fmt.Errorf("cluster %q is not connected", clusterID)
+	}
+
+	item, err := conn.Dynamic().Resource(podMetrics).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		slog.Debug("pod metrics unavailable", "cluster", clusterID, "pod", name, "error", err)
+
+		return domain.PodUsage{
+			Name:       name,
+			Namespace:  namespace,
+			Error:      podReason(err),
+			Containers: []domain.Usage{},
+		}, nil
+	}
+
+	timestamp, _, _ := unstructured.NestedString(item.Object, "timestamp")
+	window, _, _ := unstructured.NestedString(item.Object, "window")
+
+	return domain.PodUsage{
+		Name:       name,
+		Namespace:  namespace,
+		Available:  true,
+		Timestamp:  timestamp,
+		Window:     window,
+		Containers: containerUsage(*item),
+	}, nil
+}
+
 // A cluster with no metrics-server is the common case rather than a broken one,
 // so the reason travels in the sample and every view renders "—" instead of an
 // error banner it can do nothing about.
@@ -77,6 +111,16 @@ func reason(err error) string {
 	return err.Error()
 }
 
+// One pod has its own NotFound: metrics-server keeps no sample for a pod that
+// has just started, and the cluster-wide sample is what answers "is there a
+// metrics-server at all".
+func podReason(err error) string {
+	if apierrors.IsNotFound(err) {
+		return "no sample for this pod yet"
+	}
+	return reason(err)
+}
+
 func collect(items []unstructured.Unstructured, read func(unstructured.Unstructured) domain.Usage) []domain.Usage {
 	out := make([]domain.Usage, 0, len(items))
 	for i := range items {
@@ -91,19 +135,29 @@ func nodeUsage(item unstructured.Unstructured) domain.Usage {
 }
 
 // A pod's usage is the sum of its containers': the API reports one entry per
-// container and every view here is per pod.
+// container and every table here is per pod.
 func podUsage(item unstructured.Unstructured) domain.Usage {
 	usage := domain.Usage{Name: item.GetName(), Namespace: item.GetNamespace()}
 
-	containers, _, _ := unstructured.NestedSlice(item.Object, "containers")
-	for _, entry := range containers {
+	for _, container := range containerUsage(item) {
+		usage.CPUMilli += container.CPUMilli
+		usage.MemoryBytes += container.MemoryBytes
+	}
+	return usage
+}
+
+func containerUsage(item unstructured.Unstructured) []domain.Usage {
+	entries, _, _ := unstructured.NestedSlice(item.Object, "containers")
+
+	usage := make([]domain.Usage, 0, len(entries))
+	for _, entry := range entries {
 		container, ok := entry.(map[string]any)
 		if !ok {
 			continue
 		}
+		name, _, _ := unstructured.NestedString(container, "name")
 		cpu, memory := amounts(container)
-		usage.CPUMilli += cpu
-		usage.MemoryBytes += memory
+		usage = append(usage, domain.Usage{Name: name, CPUMilli: cpu, MemoryBytes: memory})
 	}
 	return usage
 }

@@ -1,7 +1,10 @@
 import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
+import { ContextMenu, type MenuAction } from '@/shared/ui/ContextMenu'
 import { useTabs } from './tab.store'
+
+type Spot = { x: number; y: number; id: string }
 
 export function TabBar() {
   const tabs = useTabs((s) => s.tabs)
@@ -9,7 +12,11 @@ export function TabBar() {
   const activate = useTabs((s) => s.activate)
   const close = useTabs((s) => s.close)
   const closeOthers = useTabs((s) => s.closeOthers)
+  const closeToSide = useTabs((s) => s.closeToSide)
+  const closeAll = useTabs((s) => s.closeAll)
   const cycle = useTabs((s) => s.cycle)
+
+  const [menu, setMenu] = useState<Spot | null>(null)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -26,6 +33,27 @@ export function TabBar() {
     return () => window.removeEventListener('keydown', onKey)
   }, [activeId, close, cycle])
 
+  const actionsFor = (id: string): MenuAction[] => {
+    const index = tabs.findIndex((tab) => tab.id === id)
+
+    return [
+      { label: 'Close', onSelect: () => close(id) },
+      { label: 'Close others', disabled: tabs.length < 2, onSelect: () => closeOthers(id) },
+      {
+        label: 'Close to the left',
+        disabled: index < 1,
+        onSelect: () => closeToSide(id, 'left'),
+        separated: true,
+      },
+      {
+        label: 'Close to the right',
+        disabled: index === tabs.length - 1,
+        onSelect: () => closeToSide(id, 'right'),
+      },
+      { label: 'Close all', onSelect: closeAll, separated: true },
+    ]
+  }
+
   return (
     <div className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-line bg-base">
       {tabs.map((tab) => {
@@ -35,10 +63,18 @@ export function TabBar() {
           <div
             key={tab.id}
             onClick={() => activate(tab.id)}
-            onAuxClick={(event) => {
-              if (event.button === 1) close(tab.id)
+            // Middle click closes on *down*: the default is autoscroll, and only
+            // preventing it there stops the drag ball from swallowing the release.
+            onMouseDown={(event) => {
+              if (event.button !== 1) return
+              event.preventDefault()
+              close(tab.id)
             }}
             onDoubleClick={() => closeOthers(tab.id)}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              setMenu({ x: event.clientX, y: event.clientY, id: tab.id })
+            }}
             className={cn(
               'group flex min-w-[112px] max-w-[220px] shrink-0 cursor-pointer items-center gap-2 border-r border-line px-3 text-sm',
               active
@@ -62,6 +98,14 @@ export function TabBar() {
           </div>
         )
       })}
+
+      {menu && (
+        <ContextMenu
+          at={menu}
+          actions={actionsFor(menu.id)}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   )
 }

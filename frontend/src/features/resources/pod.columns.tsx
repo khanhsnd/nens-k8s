@@ -48,7 +48,7 @@ export function podWarnings(pod: K8sObject): string[] {
   return warnings
 }
 
-function containerTone(container: any): Tone {
+export function containerTone(container: any): Tone {
   if (container.state?.waiting) {
     return STARTING.has(container.state.waiting.reason) ? 'warn' : 'danger'
   }

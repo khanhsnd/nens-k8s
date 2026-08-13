@@ -145,15 +145,12 @@ export function AppShell() {
     return (
       <ResourceView
         kind={kind}
+        clusterId={clusterId}
         sliceKey={sliceKey(clusterId, kind.id)}
         selectedUid={selected?.kindId === kind.id ? selected.uid : null}
-        onSelect={(row) =>
-          guard(() =>
-            setSelected((current) =>
-              current?.uid === row.metadata.uid ? null : { kindId: kind.id, uid: row.metadata.uid },
-            ),
-          )
-        }
+        // Selecting, never toggling: a click on any cell opens the drawer, so
+        // toggling would close it again on the next cell of the same row.
+        onSelect={(row) => guard(() => setSelected({ kindId: kind.id, uid: row.metadata.uid }))}
       />
     )
   }

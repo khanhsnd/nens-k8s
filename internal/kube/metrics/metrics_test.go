@@ -61,6 +61,18 @@ func (h harness) fail(resource string, err error) {
 	})
 }
 
+func (h harness) serveOne(resource string, item unstructured.Unstructured) {
+	h.dynamic.PrependReactor("get", resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, &item, nil
+	})
+}
+
+func (h harness) failOne(resource string, err error) {
+	h.dynamic.PrependReactor("get", resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, err
+	})
+}
+
 func nodeSample(name string, cpu string, memory string) unstructured.Unstructured {
 	return unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "metrics.k8s.io/v1beta1",
@@ -142,6 +154,51 @@ func TestPodUsageSumsItsContainers(t *testing.T) {
 	}
 	if pod.CPUMilli != 150 || pod.MemoryBytes != 320*1024*1024 {
 		t.Errorf("containers were not summed: %+v", pod)
+	}
+}
+
+func TestPodSampleKeepsItsContainersApart(t *testing.T) {
+	h := newReader(t)
+	sample := podSample("default", "api",
+		container("app", "120m", "256Mi"),
+		container("sidecar", "30m", "64Mi"),
+	)
+	sample.Object["timestamp"] = "2026-08-13T09:00:00Z"
+	sample.Object["window"] = "30s"
+	h.serveOne("pods", sample)
+
+	usage, err := h.reader.PodSample(context.Background(), "test", "default", "api")
+	if err != nil {
+		t.Fatalf("PodSample: %v", err)
+	}
+	if !usage.Available || usage.Timestamp != "2026-08-13T09:00:00Z" || usage.Window != "30s" {
+		t.Fatalf("usage = %+v", usage)
+	}
+	if len(usage.Containers) != 2 {
+		t.Fatalf("expected one entry per container, got %+v", usage.Containers)
+	}
+
+	app := find(t, usage.Containers, "app")
+	if app.CPUMilli != 120 || app.MemoryBytes != 256*1024*1024 {
+		t.Errorf("app = %+v", app)
+	}
+	if sidecar := find(t, usage.Containers, "sidecar"); sidecar.CPUMilli != 30 {
+		t.Errorf("sidecar = %+v", sidecar)
+	}
+}
+
+func TestPodSampleWithNoSampleYetIsNotAnError(t *testing.T) {
+	h := newReader(t)
+	h.failOne("pods", apierrors.NewNotFound(podMetrics.GroupResource(), "api"))
+
+	usage, err := h.reader.PodSample(context.Background(), "test", "default", "api")
+	if err != nil {
+		t.Fatalf("a pod metrics-server has not sampled yet must not fail the call: %v", err)
+	}
+	// The chart shows the reason; whether metrics-server exists at all is what the
+	// cluster-wide sample answers, so this NotFound is about the pod.
+	if usage.Available || usage.Error == "" || usage.Containers == nil {
+		t.Fatalf("usage = %+v", usage)
 	}
 }
 

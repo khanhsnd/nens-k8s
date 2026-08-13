@@ -10,10 +10,11 @@ permissions:
 
 env:
   WAILS_VERSION: v2.13.0
+  NSIS_VERSION: '3.12'
 
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
 
@@ -35,11 +36,12 @@ jobs:
       - name: Install NSIS
         shell: pwsh
         run: |
-          choco install nsis --yes --no-progress
-          $makensis = Get-ChildItem 'C:\Program Files (x86)\NSIS', 'C:\Program Files\NSIS' -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-          if ($null -eq $makensis) { throw 'NSIS installed but makensis.exe was not found' }
-          $makensis.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $zip = Join-Path $env:RUNNER_TEMP 'nsis.zip'
+          Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/NSIS%203/$env:NSIS_VERSION/nsis-$env:NSIS_VERSION.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
+          $nsis = Join-Path $env:RUNNER_TEMP "nsis-$env:NSIS_VERSION"
+          if (-not (Test-Path (Join-Path $nsis 'makensis.exe'))) { throw 'NSIS unpacked but makensis.exe was not found' }
+          $nsis | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
@@ -71,7 +73,7 @@ jobs:
           path: build/bin/nens-*-windows-x64-setup.exe
 
   macos:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -115,7 +117,7 @@ jobs:
           path: build/bin/nens-*-macos-universal.zip
 
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -170,7 +172,7 @@ jobs:
 
   publish:
     needs: [windows, macos, linux]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
         with:

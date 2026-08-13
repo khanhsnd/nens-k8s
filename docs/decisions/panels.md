@@ -29,3 +29,18 @@ keeps every panel's size under one localStorage key, clamped to per-panel bounds
 Bounds are a preference; the viewport is a hard limit. So the store clamps to a fixed min/max and the
 panel additionally carries a CSS `max-w-[70vw]` / `max-h-[80vh]`, which keeps a size saved on a large
 monitor from swallowing a small window.
+
+### The tab strip's context menu is hand-rolled, and middle click closes on `mousedown`
+
+`ContextMenu` (`shared/ui/ContextMenu.tsx`) is a fixed-position menu at a point, clamped into the
+window after it is measured. Radix's dropdown was the obvious reuse and is the wrong shape: it
+anchors to a trigger element, and anchoring to the pointer means feeding it a virtual element —
+more wiring than the whole component. It closes on Escape, blur, resize and any pointerdown
+outside itself; the outside check is a `contains` test rather than a blanket close, because
+closing on the pointerdown that precedes a click unmounts the item before its click lands.
+
+Middle click closes the tab on `mousedown` with `preventDefault`, not on `auxclick`: the default
+middle-button action is autoscroll, and the drag ball it opens eats the release.
+
+The menu's Close to the left/right keep the tab they were opened on and re-activate it only if the
+active tab was among the closed ones — closing tabs the user is not looking at must not move them.

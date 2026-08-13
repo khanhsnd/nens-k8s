@@ -76,3 +76,31 @@ one columns file plus one registry entry, and never a component.
 Since discovery landed, that entry declares the *fallback* version and scope and may omit
 `columns` entirely — `features/resources/catalog.ts` overlays what the cluster serves and
 falls back to generic columns. See [discovery.md](discovery.md).
+
+### The namespace filter shows its selection outside the menu
+
+The trigger says "2 namespaces"; the chips beside it say *which* two, and each chip's × drops
+that one. Removing a namespace through the menu means opening it, finding the row among
+hundreds and reading a checkbox to know what it currently is — the chip is the same action on
+the thing being removed. The menu stays the only way to *add* one, because that is a search
+over a list the toolbar has no room for.
+
+### Bulk delete is per object, and it is the view that owns it
+
+`DataGrid`'s tick boxes are only a selection (see [grid.md](grid.md)); `ResourceTable` turns
+them into `BulkDeleteDialog`, which deletes one object per request — the API has no batch
+delete. Failures are therefore per object: the dialog stays open listing exactly which names
+failed and why, while the ones that succeeded stay gone and drop out of the selection. A single
+"delete failed" for a partial run would leave the user guessing which half of it happened.
+
+The dialog names every object it is about to delete (the first 12, then a count). A confirm
+that says only "delete 37 pods?" is not a confirmation of anything the user can check.
+
+### The namespace filter is per cluster, so a cluster-scoped kind must ignore it
+
+`useNamespaceFilter` is keyed by cluster, not by table — "which namespaces am I working in" is a
+property of the cluster. `ResourceTable` therefore has to ask whether the kind it is drawing is
+namespaced at all: a Node has no `metadata.namespace`, so matching it against the chosen set
+matched nothing and the table went empty. The filter control is hidden for those kinds, which is
+what made it unexplainable — an invisible filter emptying the table reads as "the informer is
+broken", and the way out (open Pods, untick) is not discoverable from the Nodes tab.

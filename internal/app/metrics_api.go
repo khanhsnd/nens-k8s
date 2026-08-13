@@ -22,3 +22,7 @@ func (a *MetricsAPI) bind(ctx context.Context) {
 func (a *MetricsAPI) Sample(clusterID string) (domain.MetricsSample, error) {
 	return a.metrics.Sample(a.ctx, clusterID)
 }
+
+func (a *MetricsAPI) PodSample(clusterID string, namespace string, name string) (domain.PodUsage, error) {
+	return a.metrics.PodSample(a.ctx, clusterID, namespace, name)
+}

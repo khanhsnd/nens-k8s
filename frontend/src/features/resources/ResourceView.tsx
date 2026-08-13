@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useUsage, withUsage } from '@/features/metrics/usage'
+import { LoadingOverlay } from '@/shared/ui/LoadingOverlay'
 import { Placeholder } from '@/shared/ui/Placeholder'
 import type { Kind } from './kinds'
 import { useResources } from './resource.store'
@@ -15,11 +16,13 @@ function compare(a: K8sObject, b: K8sObject) {
 
 export function ResourceView({
   kind,
+  clusterId,
   sliceKey,
   selectedUid,
   onSelect,
 }: {
   kind: Kind
+  clusterId: string
   sliceKey: string
   selectedUid: string | null
   onSelect: (row: K8sObject) => void
@@ -35,19 +38,25 @@ export function ResourceView({
 
   if (!slice) return <Placeholder label={`Connect a cluster to load ${kind.id}`} />
 
-  const notice = slice.error ? (
-    <span className="text-danger">{slice.error}</span>
-  ) : slice.synced ? null : (
-    <span className="text-faint">syncing…</span>
-  )
+  const syncing = !slice.synced && !slice.error
 
   return (
-    <ResourceTable
-      kind={kind}
-      rows={rows}
-      selectedUid={selectedUid}
-      onSelect={onSelect}
-      notice={notice}
-    />
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <ResourceTable
+        kind={kind}
+        clusterId={clusterId}
+        rows={rows}
+        selectedUid={selectedUid}
+        onSelect={onSelect}
+        notice={slice.error && <span className="text-danger">{slice.error}</span>}
+      />
+
+      {syncing && (
+        <LoadingOverlay
+          label={`Syncing ${kind.id}…`}
+          detail={rows.length > 0 ? `${rows.length} loaded` : 'Listing from the API server'}
+        />
+      )}
+    </div>
   )
 }

@@ -116,6 +116,12 @@ collects all three, writes one `checksums.txt` over them and publishes the relea
 public, so the app reads that feed unauthenticated and no token is involved — the default
 `GITHUB_TOKEN` with `contents: write` is all the workflow needs.
 
+The Windows job unpacks a pinned NSIS zip from SourceForge onto PATH rather than `choco install nsis`.
+Chocolatey's community feed is a single host that rate-limits and times out on CI ranges — a 504 from
+it failed a release that had nothing wrong with it. The zip is the whole toolchain the installer
+needs: `project.nsi` and `wails_tools.nsh` include only stock headers (`MUI`, `x64`, `WinVer`,
+`FileFunc`) and no third-party plugin, so there is nothing Chocolatey was adding.
+
 Locally, each platform builds its own — the Windows one needs NSIS on PATH:
 
 ```powershell

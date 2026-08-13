@@ -53,6 +53,71 @@ function meta(name: string, seed: number, namespace?: string): K8sObject['metada
   }
 }
 
+/** Everything the drawer's container panel reads — env, mounts, probes, resources. */
+function container(app: string, index: number) {
+  return {
+    name: app,
+    image: `registry.internal/${app}:1.${index % 9}.0`,
+    imagePullPolicy: index % 3 === 0 ? 'Always' : 'IfNotPresent',
+    command: ['/bin/app'],
+    args: ['--config', '/etc/app/app.yaml', '--log-level=info'],
+    ports: [{ name: 'http', containerPort: 8080, protocol: 'TCP' }],
+    env: [
+      { name: 'APP_ENV', value: 'production' },
+      { name: 'LOG_LEVEL', value: 'info' },
+      { name: 'POD_IP', valueFrom: { fieldRef: { fieldPath: 'status.podIP' } } },
+      { name: 'DB_PASSWORD', valueFrom: { secretKeyRef: { name: `${app}-db`, key: 'password' } } },
+      {
+        name: 'FEATURE_FLAGS',
+        valueFrom: { configMapKeyRef: { name: `${app}-config`, key: 'features.json' } },
+      },
+    ],
+    envFrom: [{ configMapRef: { name: `${app}-config` } }],
+    resources: {
+      requests: { cpu: '100m', memory: '128Mi' },
+      limits: { cpu: '500m', memory: '512Mi' },
+    },
+    volumeMounts: [
+      { name: 'config', mountPath: '/etc/app', readOnly: true },
+      {
+        name: 'kube-api-access',
+        mountPath: '/var/run/secrets/kubernetes.io/serviceaccount',
+        readOnly: true,
+      },
+    ],
+    livenessProbe: { httpGet: { path: '/healthz', port: 8080 }, periodSeconds: 10 },
+    readinessProbe: { httpGet: { path: '/ready', port: 8080 }, periodSeconds: 5 },
+  }
+}
+
+const INIT_CONTAINER = {
+  name: 'wait-for-config',
+  image: 'busybox:1.36',
+  command: ['sh', '-c', 'until nc -z config 80; do sleep 1; done'],
+}
+
+const crashedState = () => ({
+  terminated: {
+    reason: 'Error',
+    exitCode: 1,
+    finishedAt: new Date(Date.now() - 120_000).toISOString(),
+  },
+})
+
+const INIT_STATUS = {
+  name: INIT_CONTAINER.name,
+  ready: true,
+  restartCount: 0,
+  state: {
+    terminated: {
+      reason: 'Completed',
+      exitCode: 0,
+      startedAt: new Date(Date.now() - 3_660_000).toISOString(),
+      finishedAt: new Date(Date.now() - 3_600_000).toISOString(),
+    },
+  },
+}
+
 function containerState(phase: string) {
   if (phase === 'Pending') return { waiting: { reason: 'ContainerCreating' } }
   if (phase === 'CrashLoopBackOff') {
@@ -84,19 +149,21 @@ function makePods(count = 800): K8sObject[] {
       },
       spec: {
         nodeName: `node-${(index % 6) + 1}.sgn.internal`,
-        initContainers: index % 4 === 0 ? [{ name: 'wait-for-config' }] : undefined,
-        containers: [{ name: app, image: `registry.internal/${app}:1.${index % 9}.0` }],
+        initContainers: index % 4 === 0 ? [INIT_CONTAINER] : undefined,
+        containers: [container(app, index)],
       },
       status: {
         phase: phase === 'CrashLoopBackOff' ? 'Running' : phase,
         qosClass: index % 3 === 0 ? 'Guaranteed' : index % 3 === 1 ? 'Burstable' : 'BestEffort',
         podIP: `10.244.${index % 6}.${(index % 250) + 2}`,
+        initContainerStatuses: index % 4 === 0 ? [INIT_STATUS] : undefined,
         containerStatuses: [
           {
             name: app,
             ready: phase === 'Running',
             restartCount: phase === 'CrashLoopBackOff' ? Math.floor(hash(index * 7) * 40) : 0,
             state: containerState(phase),
+            lastState: phase === 'CrashLoopBackOff' ? crashedState() : undefined,
           },
         ],
       },
@@ -292,13 +359,38 @@ function makeIngresses(): K8sObject[] {
   }))
 }
 
+/** One per namespace, because a pod's env reads the one beside it. */
 function makeConfigMaps(): K8sObject[] {
-  return APPS.map((app, index) => ({
-    apiVersion: 'v1',
-    kind: 'ConfigMap',
-    metadata: meta(`${app}-config`, index, NAMESPACES[index % NAMESPACES.length]),
-    data: { 'app.yaml': 'log_level: info\n', 'features.json': '{"beta":false}' },
-  }))
+  return APPS.flatMap((app, index) =>
+    NAMESPACES.map((namespace, offset) => ({
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: meta(`${app}-config`, index * NAMESPACES.length + offset, namespace),
+      data: {
+        'app.yaml': 'log_level: info\n',
+        'features.json': '{"beta":false}',
+        LOG_FORMAT: 'json',
+        MAX_WORKERS: '8',
+      },
+    })),
+  )
+}
+
+const base64 = (value: string) => btoa(value)
+
+function makeSecrets(): K8sObject[] {
+  return APPS.flatMap((app, index) =>
+    NAMESPACES.map((namespace, offset) => ({
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: meta(`${app}-db`, index * NAMESPACES.length + offset, namespace),
+      type: 'Opaque',
+      data: {
+        password: base64(`s3cr3t-${app}-${offset}`),
+        'connection-string': base64(`postgres://${app}:s3cr3t@postgres.${namespace}:5432/${app}`),
+      },
+    })),
+  ) as K8sObject[]
 }
 
 /** The CRDs behind the custom kinds of `discovery.fixtures`, so both tables agree. */
@@ -347,6 +439,7 @@ const BUILDERS: Record<string, () => K8sObject[]> = {
   services: makeServices,
   ingresses: makeIngresses,
   configmaps: makeConfigMaps,
+  secrets: makeSecrets,
   definitions: makeDefinitions,
   'crd:argoproj.io/applications': makeApplications,
 }
