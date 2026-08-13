@@ -10,6 +10,7 @@ const DEVELOPMENT: UpdateStatus = {
   current: 'dev',
   latest: '',
   available: false,
+  canInstall: false,
   page: '',
   development: true,
 }

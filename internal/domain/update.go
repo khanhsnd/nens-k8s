@@ -6,6 +6,7 @@ type UpdateStatus struct {
 	Current     string `json:"current"`
 	Latest      string `json:"latest"`
 	Available   bool   `json:"available"`
+	CanInstall  bool   `json:"canInstall"`
 	Page        string `json:"page"`
 	Development bool   `json:"development"`
 }

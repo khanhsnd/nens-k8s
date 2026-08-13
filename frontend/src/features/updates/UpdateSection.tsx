@@ -14,8 +14,9 @@ function summary(status: UpdateStatus | null, checking: boolean) {
   if (checking && !status) return 'looking for a newer release…'
   if (!status) return ''
   if (status.development) return 'a development build updates itself from the repository, not from a release'
-  if (status.available) return `Nens ${status.latest} is available — this copy is ${status.current}`
-  return `Nens ${status.current} is the latest release`
+  if (!status.available) return `Nens ${status.current} is the latest release`
+  if (status.canInstall) return `Nens ${status.latest} is available — this copy is ${status.current}`
+  return `Nens ${status.latest} is available — replace this ${status.current} copy from the release page`
 }
 
 export function UpdateSection() {
@@ -33,16 +34,17 @@ export function UpdateSection() {
         <span className="min-w-0 flex-1 truncate text-muted">{summary(status, checking)}</span>
 
         {status?.available && (
-          <>
-            <button onClick={() => void openRelease()} className={BUTTON}>
-              <ExternalLink className="size-3.5" />
-              Release notes
-            </button>
-            <button disabled={installing} onClick={() => void install()} className={PRIMARY}>
-              <Download className="size-3.5" />
-              {installing ? 'Downloading…' : 'Install and restart'}
-            </button>
-          </>
+          <button onClick={() => void openRelease()} className={status.canInstall ? BUTTON : PRIMARY}>
+            <ExternalLink className="size-3.5" />
+            Release notes
+          </button>
+        )}
+
+        {status?.canInstall && (
+          <button disabled={installing} onClick={() => void install()} className={PRIMARY}>
+            <Download className="size-3.5" />
+            {installing ? 'Downloading…' : 'Install and restart'}
+          </button>
         )}
 
         <button disabled={checking} onClick={() => void check()} className={BUTTON}>

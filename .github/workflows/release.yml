@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  WAILS_VERSION: v2.13.0
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -39,8 +42,7 @@ jobs:
           $makensis.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Wails
-        shell: pwsh
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
       - name: Stamp the version
         shell: pwsh
@@ -61,10 +63,123 @@ jobs:
           wails build -platform windows/amd64 -nsis
           $built = Get-ChildItem build/bin -Filter '*-installer.exe' | Select-Object -First 1
           if ($null -eq $built) { throw 'Wails did not produce an NSIS installer' }
-          $setup = "nens-$version-windows-x64-setup.exe"
-          Copy-Item $built.FullName "build/bin/$setup"
-          $hash = (Get-FileHash -Algorithm SHA256 "build/bin/$setup").Hash.ToLower()
-          "$hash  $setup" | Set-Content "build/bin/checksums.txt" -Encoding ascii
+          Copy-Item $built.FullName "build/bin/nens-$version-windows-x64-setup.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: build/bin/nens-*-windows-x64-setup.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test
+        run: go test ./...
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Stamp the version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          jq --arg version "$version" '.info.productVersion = $version' wails.json > wails.stamped.json
+          mv wails.stamped.json wails.json
+
+      - name: Build the app bundle
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          wails build -platform darwin/universal
+          ditto -c -k --sequesterRsrc --keepParent build/bin/nens.app "build/bin/nens-$version-macos-universal.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: build/bin/nens-*-macos-universal.zip
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install WebKit
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Test
+        run: go test ./...
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Stamp the version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          jq --arg version "$version" '.info.productVersion = $version' wails.json > wails.stamped.json
+          mv wails.stamped.json wails.json
+
+      - name: Build the archive
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          wails build -platform linux/amd64 -tags webkit2_41
+          staging="nens-$version-linux-x64"
+          mkdir -p "$staging"
+          cp build/bin/nens "$staging/nens"
+          cp build/linux/nens.desktop "$staging/nens.desktop"
+          cp build/appicon.png "$staging/nens.png"
+          tar -czf "build/bin/$staging.tar.gz" "$staging"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: build/bin/nens-*-linux-x64.tar.gz
+
+  publish:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksum every asset
+        working-directory: dist
+        run: sha256sum nens-* > checksums.txt
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
@@ -72,10 +187,14 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Nens ${{ github.ref_name }}
           body: |
-            Windows x64 installer. The app checks this feed from Settings → Updates.
+            | Platform | Asset | Updating |
+            | --- | --- | --- |
+            | Windows 10/11 x64 | `-windows-x64-setup.exe` | Settings → Updates installs it |
+            | macOS 12+ universal | `-macos-universal.zip` | Settings → Updates opens this page |
+            | Linux x64 (WebKit2GTK 4.1) | `-linux-x64.tar.gz` | Settings → Updates opens this page |
 
-            Nothing here is signed: SmartScreen will warn on first run until a
-            code-signing certificate exists.
-          files: |
-            build/bin/nens-*-windows-x64-setup.exe
-            build/bin/checksums.txt
+            Verify a download against `checksums.txt`.
+
+            Nothing here is signed or notarized: SmartScreen warns on Windows, and macOS
+            needs `xattr -dr com.apple.quarantine nens.app` after unzipping.
+          files: dist/*

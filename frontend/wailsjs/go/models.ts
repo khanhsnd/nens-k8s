@@ -509,6 +509,7 @@ export namespace domain {
 	    current: string;
 	    latest: string;
 	    available: boolean;
+	    canInstall: boolean;
 	    page: string;
 	    development: boolean;
 	
@@ -521,6 +522,7 @@ export namespace domain {
 	        this.current = source["current"];
 	        this.latest = source["latest"];
 	        this.available = source["available"];
+	        this.canInstall = source["canInstall"];
 	        this.page = source["page"];
 	        this.development = source["development"];
 	    }

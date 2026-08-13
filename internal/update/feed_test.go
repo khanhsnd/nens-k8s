@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -53,7 +54,7 @@ func checksums(t *testing.T, version string, body string) string {
 	t.Helper()
 
 	sum := sha256.Sum256([]byte(body))
-	return hex.EncodeToString(sum[:]) + "  " + installerName(version)
+	return hex.EncodeToString(sum[:]) + "  " + assetName(version)
 }
 
 func publish(t *testing.T, version string) published {
@@ -62,8 +63,8 @@ func publish(t *testing.T, version string) published {
 	return published{
 		tag: "v" + version,
 		assets: map[string]string{
-			installerName(version): installer,
-			checksumsName:          checksums(t, version, installer),
+			assetName(version): installer,
+			checksumsName:      checksums(t, version, installer),
 		},
 	}
 }
@@ -126,7 +127,32 @@ func TestStatusRejectsAReleaseItCannotUse(t *testing.T) {
 	}
 }
 
+func TestOnlyTheWindowsBuildInstallsItself(t *testing.T) {
+	source := feed(t, "0.1.0", publish(t, "0.2.0"))
+
+	status, err := source.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Available {
+		t.Fatalf("status = %+v, want the newer release", status)
+	}
+	if status.CanInstall != selfInstalling {
+		t.Errorf("canInstall = %t on %s", status.CanInstall, runtime.GOOS)
+	}
+
+	if !selfInstalling {
+		if _, err := source.Download(context.Background()); err == nil {
+			t.Error("Download should refuse on a platform Nens cannot replace in place")
+		}
+	}
+}
+
 func TestDownloadKeepsWhatMatchesTheChecksum(t *testing.T) {
+	if !selfInstalling {
+		t.Skip("only the Windows build downloads an installer")
+	}
+
 	path, err := feed(t, "0.1.0", publish(t, "0.2.0")).Download(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -143,8 +169,12 @@ func TestDownloadKeepsWhatMatchesTheChecksum(t *testing.T) {
 }
 
 func TestDownloadRefusesWhatDoesNotMatchTheChecksum(t *testing.T) {
+	if !selfInstalling {
+		t.Skip("only the Windows build downloads an installer")
+	}
+
 	tampered := publish(t, "0.2.0")
-	tampered.assets[installerName("0.2.0")] = "something else entirely"
+	tampered.assets[assetName("0.2.0")] = "something else entirely"
 
 	path, err := feed(t, "0.1.0", tampered).Download(context.Background())
 	if err == nil {
@@ -157,6 +187,10 @@ func TestDownloadRefusesWhatDoesNotMatchTheChecksum(t *testing.T) {
 }
 
 func TestDownloadRefusesWhenThereIsNothingNewer(t *testing.T) {
+	if !selfInstalling {
+		t.Skip("only the Windows build downloads an installer")
+	}
+
 	if _, err := feed(t, "0.2.0", publish(t, "0.2.0")).Download(context.Background()); err == nil {
 		t.Error("Download should refuse to reinstall the running version")
 	}

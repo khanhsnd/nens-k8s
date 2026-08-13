@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Nens
+Comment=A desktop Kubernetes client
+Exec=nens
+Icon=nens
+Categories=Development;
+Terminal=false
+StartupWMClass=nens

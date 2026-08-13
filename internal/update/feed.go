@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -60,6 +61,7 @@ func (f *Feed) Status(ctx context.Context) (domain.UpdateStatus, error) {
 	slog.Info("checked for updates", "current", f.version, "latest", latest.version, "available", newer)
 	status.Latest = latest.version
 	status.Available = newer
+	status.CanInstall = newer && selfInstalling
 	status.Page = latest.page
 	return status, nil
 }
@@ -67,6 +69,9 @@ func (f *Feed) Status(ctx context.Context) (domain.UpdateStatus, error) {
 func (f *Feed) Download(ctx context.Context) (string, error) {
 	if f.version == development {
 		return "", errDevelopment
+	}
+	if !selfInstalling {
+		return "", fmt.Errorf("a %s build is replaced from the release page, not from inside the app", runtime.GOOS)
 	}
 
 	latest, err := f.latest(ctx)
@@ -118,14 +123,14 @@ func (f *Feed) latest(ctx context.Context) (release, error) {
 	found := release{version: version, page: published.HTMLURL}
 	for _, asset := range published.Assets {
 		switch asset.Name {
-		case installerName(version):
+		case assetName(version):
 			found.installer = asset.URL
 		case checksumsName:
 			found.checksums = asset.URL
 		}
 	}
 	if found.installer == "" || found.checksums == "" {
-		return release{}, fmt.Errorf("release %s has no %s beside its %s", version, checksumsName, installerName(version))
+		return release{}, fmt.Errorf("release %s has no %s beside its %s", version, checksumsName, assetName(version))
 	}
 	return found, nil
 }
@@ -175,7 +180,7 @@ func (f *Feed) checksum(ctx context.Context, latest release) (string, error) {
 		return "", err
 	}
 
-	name := installerName(latest.version)
+	name := assetName(latest.version)
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == name && len(fields[0]) == hex.EncodedLen(sha256.Size) {
@@ -212,8 +217,20 @@ type release struct {
 	checksums string
 }
 
-func installerName(version string) string {
-	return "nens-" + version + "-windows-x64-setup.exe"
+// Only the Windows build replaces itself: it ships an NSIS installer that owns
+// the running exe. A macOS app bundle and a Linux archive were put wherever
+// their reader chose, so the release page is the honest answer there.
+const selfInstalling = runtime.GOOS == "windows"
+
+func assetName(version string) string {
+	switch runtime.GOOS {
+	case "windows":
+		return "nens-" + version + "-windows-x64-setup.exe"
+	case "darwin":
+		return "nens-" + version + "-macos-universal.zip"
+	default:
+		return "nens-" + version + "-linux-x64.tar.gz"
+	}
 }
 
 func isNewer(current string, latest string) (bool, error) {
