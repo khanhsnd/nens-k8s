@@ -57,7 +57,17 @@ Run the installer. SmartScreen will warn: **More info** → **Run anyway**.
 
 ### macOS 12+ universal — `nens-<version>-macos-universal.zip`
 
-Unzip, move `nens.app` to Applications, then clear the quarantine flag as above.
+Unzip and move `nens.app` to Applications — or install it from the tap:
+
+```bash
+brew install --cask khanhsnd/tap/nens
+```
+
+Either way the app is unsigned, so Gatekeeper needs the quarantine flag cleared on first run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/nens.app
+```
 
 ### Linux x64 — `nens-<version>-linux-x64.tar.gz`
 

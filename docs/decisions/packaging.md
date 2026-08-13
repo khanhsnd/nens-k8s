@@ -110,8 +110,8 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` runs `go test ./...` on each of `windows-latest`, `macos-latest` and
-`ubuntu-latest`, stamps `wails.json` from the tag, builds that platform's asset, and a fourth job
+`.github/workflows/release.yml` runs `go test ./internal/...` on each of `windows-2025`, `macos-15`
+and `ubuntu-24.04`, stamps `wails.json` from the tag, builds that platform's asset, and a fourth job
 collects all three, writes one `checksums.txt` over them and publishes the release. The repository is
 public, so the app reads that feed unauthenticated and no token is involved — the default
 `GITHUB_TOKEN` with `contents: write` is all the workflow needs.
@@ -121,6 +121,43 @@ Chocolatey's community feed is a single host that rate-limits and times out on C
 it failed a release that had nothing wrong with it. The zip is the whole toolchain the installer
 needs: `project.nsi` and `wails_tools.nsh` include only stock headers (`MUI`, `x64`, `WinVer`,
 `FileFunc`) and no third-party plugin, so there is nothing Chocolatey was adding.
+
+### The Homebrew Cask is written by the release, not maintained by hand
+
+A fifth job rewrites `Casks/nens.rb` in `khanhsnd/homebrew-tap` from the macOS artifact it just
+published, because the Cask carries the one field a human always gets wrong: the `sha256` of a zip
+that only exists after the build. It reads the hash from the downloaded artifact rather than from
+`checksums.txt`, so the Cask and the asset cannot disagree.
+
+The Cask's `url` points at this repository's own releases. That is the whole difference from a
+private-source project, which has to publish assets to a separate public repository first and then
+point the Cask there — being public removes that hop, and with it the token that guarded it. The push
+into the tap still needs `secrets.RELEASES_TOKEN`: `GITHUB_TOKEN` is scoped to the repository that
+started the run, so it cannot write to another one no matter what permissions it is given.
+
+`version` and `sha256` are interpolated by the shell that writes the file; `#{version}` inside the
+`url` is Ruby interpolation Homebrew evaluates itself, which is why the heredoc is unquoted but that
+one string survives it. Keeping both means the version appears once.
+
+The Cask installs the same unsigned bundle as the zip, so Gatekeeper treats it the same way — a tap
+is a download convenience, not a substitute for notarization.
+
+### `allowBuilds` is what lets the frontend build at all
+
+pnpm refuses to run a dependency's install scripts unless the project names it, and esbuild — Vite's
+bundler — is such a dependency. Unapproved, `pnpm install` exits non-zero with
+`ERR_PNPM_IGNORED_BUILDS`, which fails `frontend:install` and therefore every `wails build` and `wails
+dev`. `frontend/pnpm-workspace.yaml` grants exactly one:
+
+```yaml
+allowBuilds:
+  esbuild: true
+```
+
+It has to live there rather than in `package.json`'s `pnpm.onlyBuiltDependencies`: pnpm 11 ignores the
+`package.json` field and rewrites `pnpm-workspace.yaml` with an unanswered placeholder instead, which
+fails the same way. `allowBuilds` is read by both pnpm 10 and 11, so the CI pin and a newer local
+install agree.
 
 Locally, each platform builds its own — the Windows one needs NSIS on PATH:
 
