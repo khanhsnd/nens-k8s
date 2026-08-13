@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   activeCluster,
   subscribeClusterEvents,
@@ -8,6 +8,10 @@ import { clusterResources, useDiscovery } from '@/features/discovery/discovery.s
 import { Dock } from '@/features/dock/Dock'
 import { useDock } from '@/features/dock/dock.store'
 import { subscribeLogEvents } from '@/features/logs/log.store'
+import { useMetrics } from '@/features/metrics/metrics.store'
+import { useUsage, withUsage } from '@/features/metrics/usage'
+import { OverviewView } from '@/features/overview/OverviewView'
+import { OVERVIEW_KINDS } from '@/features/overview/overview.model'
 import { PortForwardView } from '@/features/portforward/PortForwardView'
 import { subscribeForwardEvents, useForwards } from '@/features/portforward/portforward.store'
 import { kindFor } from '@/features/resources/catalog'
@@ -37,6 +41,7 @@ export function AppShell() {
   const resources = useDiscovery(clusterResources(clusterId))
   const sync = useResources((s) => s.sync)
   const guard = useEditorGuard((s) => s.guard)
+  const follow = useMetrics((s) => s.follow)
   const dockMaximized = useDock((s) => s.maximized)
 
   const [selected, setSelected] = useState<{ key: string; uid: string } | null>(null)
@@ -67,11 +72,17 @@ export function AppShell() {
     void useForwards.getState().sync(connected)
   }, [clusters])
 
+  // One tab is one leaf, except Overview, which reads several — so the wanted
+  // kinds are deduplicated: subscribing the same slice twice would leak a token.
   useEffect(() => {
-    const kinds = tabs
-      .map((item) => kindFor(item.leafId, resources))
-      .filter((kind): kind is Kind => kind !== null)
-    void sync(phase === 'connected' ? clusterId : null, kinds)
+    const kinds = new Map<string, Kind>()
+    for (const item of tabs) {
+      for (const leafId of item.leafId === 'overview' ? OVERVIEW_KINDS : [item.leafId]) {
+        const kind = kindFor(leafId, resources)
+        if (kind) kinds.set(kind.id, kind)
+      }
+    }
+    void sync(phase === 'connected' ? clusterId : null, [...kinds.values()])
   }, [clusterId, phase, tabs, resources, sync])
 
   const kind = tab ? kindFor(tab.leafId, resources) : null
@@ -80,9 +91,25 @@ export function AppShell() {
     selected && selected.key === key ? s.slices[key]?.objects.get(selected.uid) : undefined,
   )
 
+  // Nothing polls metrics.k8s.io unless what is on screen shows usage.
+  const wantsMetrics = tab?.leafId === 'overview' || Boolean(kind?.metrics)
+  useEffect(() => {
+    follow(wantsMetrics && phase === 'connected' ? clusterId : null)
+  }, [follow, wantsMetrics, phase, clusterId])
+
+  const usage = useUsage(kind)
+  const detail = useMemo(
+    () => selectedObject && withUsage(usage, selectedObject),
+    [selectedObject, usage],
+  )
+
   function content() {
     if (!tab) return <Placeholder label="No open tab — pick a resource from the sidebar" />
     if (tab.leafId === 'portforward') return <PortForwardView />
+    if (tab.leafId === 'overview') {
+      if (!clusterId) return <Placeholder label="Select a cluster to see its overview" />
+      return <OverviewView clusterId={clusterId} />
+    }
     if (!kind) return <Placeholder label={`${tab.title} — not wired up yet`} />
     if (!key) return <Placeholder label="Select a cluster to load resources" />
 
@@ -115,9 +142,9 @@ export function AppShell() {
           </div>
         </main>
 
-        {selectedObject && kind && clusterId && (
+        {detail && kind && clusterId && (
           <DetailDrawer
-            object={selectedObject}
+            object={detail}
             kind={kind}
             clusterId={clusterId}
             onClose={() => setSelected(null)}

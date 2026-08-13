@@ -1,8 +1,27 @@
+import { bytes, millicores, percent } from '@/shared/lib/format'
+import { millicoresOf, quantity } from '@/shared/lib/quantity'
 import { Badge } from '@/shared/ui/Badge'
 import { AGE_COLUMN, NAME_COLUMN } from './common.columns'
 import type { K8sObject, ResourceColumn } from './resource.types'
 
 const ROLE_PREFIX = 'node-role.kubernetes.io/'
+
+/**
+ * What the kubelet says is left for pods, not the machine's raw capacity — it is
+ * what usage is worth comparing against, and what the scheduler works from.
+ */
+export const allocatableCPU = (node: K8sObject): number => millicoresOf(node.status?.allocatable?.cpu)
+
+export const allocatableMemory = (node: K8sObject): number =>
+  quantity(node.status?.allocatable?.memory)
+
+export const allocatablePods = (node: K8sObject): number => quantity(node.status?.allocatable?.pods)
+
+/** Usage next to its share of the node, because neither number means much alone. */
+function used(usage: number | undefined, total: number, format: (value: number) => string): string {
+  if (usage === undefined) return '—'
+  return `${format(usage)} (${percent(usage, total)})`
+}
 
 function condition(node: K8sObject, type: string): string {
   return (node.status?.conditions ?? []).find((item: any) => item.type === type)?.status ?? 'Unknown'
@@ -40,6 +59,20 @@ export const NODE_COLUMNS: ResourceColumn[] = [
     ),
   },
   { key: 'roles', label: 'Roles', min: 110, grow: 0.7, text: roles },
+  {
+    key: 'cpu',
+    label: 'CPU',
+    min: 110,
+    grow: 0.5,
+    text: (row) => used(row.metrics?.cpuMilli, allocatableCPU(row), millicores),
+  },
+  {
+    key: 'memory',
+    label: 'Memory',
+    min: 120,
+    grow: 0.5,
+    text: (row) => used(row.metrics?.memoryBytes, allocatableMemory(row), bytes),
+  },
   { key: 'ip', label: 'Internal IP', min: 110, grow: 0.6, text: internalIP },
   {
     key: 'version',

@@ -101,11 +101,26 @@ composites, so `requestAnimationFrame` never fires) — the data path was verifi
 Exit: verified against fixtures (browser dev server) and a scripted discovery interface + the fake
 dynamic client. `ServerPreferredResources` has never run against a real API server.
 
-## Phase 7 — Metrics + overview
+## Phase 7 — Metrics + overview (done)
 
-- `metrics.k8s.io` client for node/pod CPU + memory, polled at 30s (not watched — the API has no watch).
-- Cluster Overview: node capacity donuts, pod phase breakdown, recent warning events.
-- Degrade cleanly when metrics-server is absent.
+- `internal/kube/metrics.Reader`: stateless `Sample(clusterID)` over `metrics.k8s.io/v1beta1`
+  through the dynamic client — no new dependency — returning millicores and bytes per node and
+  per pod, a pod's usage being the sum of its containers'. `MetricsAPI.Sample`.
+- Not watchable, so nothing is pushed: `features/metrics/metrics.store.ts` owns the 30s poll and
+  `AppShell` only runs it while the open tab is the Overview or a kind that declares `metrics`.
+- `features/metrics/usage.ts` attaches a sample to a row on the way to the table, so the informer
+  cache stays the server's truth and CPU/Memory are ordinary columns on Pods and Nodes (Nodes
+  showing the share of `status.allocatable`, parsed by `shared/lib/quantity.ts`).
+- `features/overview`: CPU, memory and pod-capacity donuts, nodes ready, pod phases as one
+  stacked bar, and the 25 most recent warning events. It is a view rather than a kind, so
+  `AppShell` expands its tab into three subscriptions (nodes, pods, events) and deduplicates.
+- A cluster with no metrics-server is an answer rather than an error: `Available: false` plus a
+  reason, donuts and cells render `—`, and everything that does not need metrics still works.
+
+Exit: verified against fixtures (browser dev server) and the fake dynamic client, including the
+unavailable path. `metrics.k8s.io` has never been listed against a real API server. Screenshots
+were again impossible in the headless browser pane, so the layout was verified through the DOM
+and computed styles in both themes.
 
 ## Phase 8 — Helm
 

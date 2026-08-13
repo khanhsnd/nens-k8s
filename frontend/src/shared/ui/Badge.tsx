@@ -54,13 +54,15 @@ export function Pill({
   )
 }
 
+/** The fill of a tone, for anything shaped by size rather than by text. */
+export const FILLS: Record<Tone, string> = {
+  neutral: 'bg-faint',
+  ok: 'bg-ok',
+  warn: 'bg-warn',
+  danger: 'bg-danger',
+  info: 'bg-info',
+}
+
 export function Dot({ tone = 'neutral' }: { tone?: Tone }) {
-  const colors: Record<Tone, string> = {
-    neutral: 'bg-faint',
-    ok: 'bg-ok',
-    warn: 'bg-warn',
-    danger: 'bg-danger',
-    info: 'bg-info',
-  }
-  return <span className={cn('size-1.5 shrink-0 rounded-full', colors[tone])} />
+  return <span className={cn('size-1.5 shrink-0 rounded-full', FILLS[tone])} />
 }

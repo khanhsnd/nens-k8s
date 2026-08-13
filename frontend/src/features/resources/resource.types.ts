@@ -22,7 +22,8 @@ export type K8sObject = {
   spec?: Record<string, any>
   status?: Record<string, any>
   data?: Record<string, string>
-  metrics?: { cpu?: string; memory?: string }
+  /** Attached by `features/metrics`, never sent by the informer. */
+  metrics?: { cpuMilli: number; memoryBytes: number }
 }
 
 export type ResourceRef = {

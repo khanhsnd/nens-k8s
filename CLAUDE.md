@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Nens — a Wails v2 desktop Kubernetes client. Go backend (`main.go` + `internal/`), React 19 + Vite + Tailwind v4 frontend (`frontend/`). The frontend is embedded into the binary via `//go:embed all:frontend/dist`.
 
-`docs/ROADMAP.md` is the authoritative plan: phases 1–6 (shell, live resources, YAML, logs, exec + port-forward, discovery + CRDs) are done, phases 7+ (metrics, Helm, hardening) are not. Read it before adding a feature — it already specifies the intended package layout and API shape for each phase.
+`docs/ROADMAP.md` is the authoritative plan: phases 1–7 (shell, live resources, YAML, logs, exec + port-forward, discovery + CRDs, metrics + overview) are done, phases 8+ (Helm, hardening) are not. Read it before adding a feature — it already specifies the intended package layout and API shape for each phase.
 
 ## Docs
 
@@ -48,7 +48,7 @@ go test ./...
 These are load-bearing — `docs/ROADMAP.md` states them and the code follows them:
 
 - `internal/domain` — entities and **port interfaces only**. Imports no Wails and no infra beyond `k8s.io/client-go/rest`.
-- `internal/kube/*` — adapters implementing those ports (`kubeconfig.Loader` → `KubeconfigSource` + `KubeconfigFiles`, `cluster.Registry` → `ClusterRegistry`, `resource.Store` → `ResourceSubscriber`, `discovery.Cache` → `APIDiscovery`, `pods.Resolver` → `ContainerResolver`, `logs.Streamer` → `LogStreamer`, `exec.Runner` → `ExecRunner`, `forward.Registry` → `PortForwarder`). `internal/config` is the settings adapter (`SettingsStore`).
+- `internal/kube/*` — adapters implementing those ports (`kubeconfig.Loader` → `KubeconfigSource` + `KubeconfigFiles`, `cluster.Registry` → `ClusterRegistry`, `resource.Store` → `ResourceSubscriber`, `discovery.Cache` → `APIDiscovery`, `metrics.Reader` → `MetricsSampler`, `pods.Resolver` → `ContainerResolver`, `logs.Streamer` → `LogStreamer`, `exec.Runner` → `ExecRunner`, `forward.Registry` → `PortForwarder`). `internal/config` is the settings adapter (`SettingsStore`).
 - `internal/app/*` — the Wails binding surface only, no logic. One struct per bounded API (`ClusterAPI`, `KubeconfigAPI`, `ResourceAPI`), registered in `App.Bindings()`.
 - `internal/event` — the only package allowed to touch `runtime.EventsEmit`. Everything else publishes through `domain.Publisher`. Other Wails runtime calls (native dialogs) belong in `internal/app`, which is the Wails edge — never deeper.
 - Frontend mirrors it: `features/*` own state + views, `shared/*` is generic, `app/layout` is composition only.
@@ -78,7 +78,8 @@ Clusters come from `clientcmd`'s default loading rules **plus** the paths in `co
 - Open views are tabs (`features/tabs/tab.store.ts`); the sidebar and command palette open/focus a tab, they do not hold the current selection.
 - Anything you watch rather than read — logs and shells — is a **dock tool** (`features/dock`), not a drawer tab. The drawer is for one object's static detail. Add a `DockTool.kind`, never a second panel.
 - "Which containers can I attach to" is answered once, by `features/containers` over `ContainerAPI.Targets`. Logs and terminal both read it; neither imports the other.
-- Port Forwarding has no GVR, so it is not a kind: `AppShell` renders `features/portforward` from the leaf id, and its rows go through the same `DataGrid` with a `Column<PortForward>[]` spec.
+- Port Forwarding has no GVR, so it is not a kind: `AppShell` renders `features/portforward` from the leaf id, and its rows go through the same `DataGrid` with a `Column<PortForward>[]` spec. The Overview is the same shape — `features/overview` from the leaf id — except that it reads three slices, so `AppShell` expands its tab into `OVERVIEW_KINDS` and deduplicates before subscribing.
+- `metrics.k8s.io` cannot be watched, so `features/metrics` polls it every 30s and only while something on screen shows usage. Usage is attached to a row on its way to the table (`usage.ts`), never merged into the informer cache — see `decisions/metrics.md`.
 - Panels resize through `shared/ui/Resizer.tsx` and remember their size in `shared/ui/panel.size.ts`. Never hand-roll a drag handle.
 - Sidebar tree is `features/navigation/nav.tree.ts`: the curated sections of `nav.model.ts` filtered to what the connected cluster serves, plus one section per custom API group. `features/discovery` owns the served API surface, loaded once per connection like the forward registry's restore.
 

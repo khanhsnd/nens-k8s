@@ -1,4 +1,5 @@
 import { TriangleAlert } from 'lucide-react'
+import { bytes, millicores } from '@/shared/lib/format'
 import { Badge, Dot, type Tone } from '@/shared/ui/Badge'
 import { Tooltip } from '@/shared/ui/Tooltip'
 import { AGE_COLUMN, NAME_COLUMN, NAMESPACE_COLUMN } from './common.columns'
@@ -107,16 +108,14 @@ export const POD_COLUMNS: ResourceColumn[] = [
     label: 'CPU',
     min: 64,
     grow: 0.3,
-    hidden: true,
-    text: (row) => row.metrics?.cpu ?? '—',
+    text: (row) => (row.metrics ? millicores(row.metrics.cpuMilli) : '—'),
   },
   {
     key: 'memory',
     label: 'Memory',
     min: 76,
     grow: 0.3,
-    hidden: true,
-    text: (row) => row.metrics?.memory ?? '—',
+    text: (row) => (row.metrics ? bytes(row.metrics.memoryBytes) : '—'),
   },
   {
     key: 'containers',

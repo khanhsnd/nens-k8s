@@ -91,21 +91,69 @@ function makeDeployments(): K8sObject[] {
   )
 }
 
+const NODE_SIZES = [
+  { cpu: '4', memory: '16Gi', allocatableCPU: '3860m', allocatableMemory: '15Gi', pods: '110' },
+  { cpu: '8', memory: '32Gi', allocatableCPU: '7820m', allocatableMemory: '30Gi', pods: '200' },
+  { cpu: '16', memory: '64Gi', allocatableCPU: '15780m', allocatableMemory: '61Gi', pods: '250' },
+]
+
 function makeNodes(): K8sObject[] {
-  return Array.from({ length: 6 }, (_, index): K8sObject => ({
-    apiVersion: 'v1',
-    kind: 'Node',
-    metadata: {
-      ...meta(`node-${index + 1}.sgn.internal`, index),
-      labels: index < 2 ? { 'node-role.kubernetes.io/control-plane': '' } : {},
-    },
-    spec: { unschedulable: index === 5 },
-    status: {
-      conditions: [{ type: 'Ready', status: index === 4 ? 'False' : 'True' }],
-      addresses: [{ type: 'InternalIP', address: `10.20.0.${index + 10}` }],
-      nodeInfo: { kubeletVersion: 'v1.31.4', osImage: 'Ubuntu 22.04.5 LTS' },
-    },
-  }))
+  return Array.from({ length: 6 }, (_, index): K8sObject => {
+    const size = NODE_SIZES[index % NODE_SIZES.length]
+
+    return {
+      apiVersion: 'v1',
+      kind: 'Node',
+      metadata: {
+        ...meta(`node-${index + 1}.sgn.internal`, index),
+        labels: index < 2 ? { 'node-role.kubernetes.io/control-plane': '' } : {},
+      },
+      spec: { unschedulable: index === 5 },
+      status: {
+        conditions: [{ type: 'Ready', status: index === 4 ? 'False' : 'True' }],
+        addresses: [{ type: 'InternalIP', address: `10.20.0.${index + 10}` }],
+        nodeInfo: { kubeletVersion: 'v1.31.4', osImage: 'Ubuntu 22.04.5 LTS' },
+        capacity: { cpu: size.cpu, memory: size.memory, pods: size.pods },
+        allocatable: {
+          cpu: size.allocatableCPU,
+          memory: size.allocatableMemory,
+          pods: size.pods,
+        },
+      },
+    }
+  })
+}
+
+const WARNINGS: Array<[string, string]> = [
+  ['BackOff', 'Back-off restarting failed container'],
+  ['Unhealthy', 'Readiness probe failed: HTTP probe failed with statuscode: 503'],
+  ['FailedScheduling', '0/6 nodes are available: 3 Insufficient cpu, 3 node(s) had untolerated taint'],
+  ['FailedMount', 'Unable to attach or mount volumes: unmounted volumes=[config]'],
+  ['NodeNotReady', 'Node node-5.sgn.internal status is now: NodeNotReady'],
+]
+
+/** Enough Normal events that the overview's warning filter is doing something. */
+function makeEvents(): K8sObject[] {
+  return fixtureObjects('pods').slice(0, 60).map((pod, index): K8sObject => {
+    const warning = index % 3 === 0
+    const [reason, message] = WARNINGS[index % WARNINGS.length]
+
+    return {
+      apiVersion: 'v1',
+      kind: 'Event',
+      metadata: meta(`${pod.metadata.name}.${index.toString(16)}`, index, pod.metadata.namespace),
+      type: warning ? 'Warning' : 'Normal',
+      reason: warning ? reason : 'Pulled',
+      message: warning ? message : 'Container image already present on machine',
+      count: warning ? Math.floor(hash(index * 23) * 30) + 1 : 1,
+      lastTimestamp: new Date(Date.now() - Math.floor(hash(index * 5) * 3600_000)).toISOString(),
+      involvedObject: {
+        kind: 'Pod',
+        name: pod.metadata.name,
+        namespace: pod.metadata.namespace,
+      },
+    } as K8sObject
+  })
 }
 
 function makeServices(): K8sObject[] {
@@ -170,6 +218,7 @@ const BUILDERS: Record<string, () => K8sObject[]> = {
   pods: makePods,
   deployments: makeDeployments,
   nodes: makeNodes,
+  events: makeEvents,
   services: makeServices,
   configmaps: makeConfigMaps,
   definitions: makeDefinitions,

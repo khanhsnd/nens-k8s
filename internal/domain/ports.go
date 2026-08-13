@@ -58,6 +58,10 @@ type APIDiscovery interface {
 	Refresh(ctx context.Context, clusterID string) ([]APIResource, error)
 }
 
+type MetricsSampler interface {
+	Sample(ctx context.Context, clusterID string) (MetricsSample, error)
+}
+
 type ResourceEditor interface {
 	Get(ctx context.Context, ref ResourceRef) (map[string]any, error)
 	Apply(ctx context.Context, ref ResourceRef, object map[string]any) (map[string]any, error)

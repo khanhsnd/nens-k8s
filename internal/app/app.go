@@ -13,6 +13,7 @@ import (
 	"nens-k8s/internal/kube/forward"
 	"nens-k8s/internal/kube/kubeconfig"
 	"nens-k8s/internal/kube/logs"
+	"nens-k8s/internal/kube/metrics"
 	"nens-k8s/internal/kube/pods"
 	"nens-k8s/internal/kube/resource"
 )
@@ -24,6 +25,7 @@ type App struct {
 	kubeconfigs *KubeconfigAPI
 	discovery   *DiscoveryAPI
 	resources   *ResourceAPI
+	metrics     *MetricsAPI
 	containers  *ContainerAPI
 	logs        *LogAPI
 	shells      *ExecAPI
@@ -45,6 +47,7 @@ func New() *App {
 		kubeconfigs: NewKubeconfigAPI(loader),
 		discovery:   NewDiscoveryAPI(discovery.NewCache(registry)),
 		resources:   NewResourceAPI(resource.NewStore(registry, bus), resource.NewEditor(registry)),
+		metrics:     NewMetricsAPI(metrics.NewReader(registry)),
 		containers:  NewContainerAPI(pods.NewResolver(registry)),
 		logs:        NewLogAPI(logs.NewStreamer(registry, bus)),
 		shells:      NewExecAPI(exec.NewRunner(registry, bus)),
@@ -60,6 +63,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.kubeconfigs.bind(ctx)
 	a.discovery.bind(ctx)
 	a.resources.bind(ctx)
+	a.metrics.bind(ctx)
 	a.containers.bind(ctx)
 	a.logs.bind(ctx)
 	a.shells.bind(ctx)
@@ -77,6 +81,7 @@ func (a *App) Bindings() []any {
 		a.kubeconfigs,
 		a.discovery,
 		a.resources,
+		a.metrics,
 		a.containers,
 		a.logs,
 		a.shells,

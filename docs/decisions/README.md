@@ -11,6 +11,7 @@ especially when the obvious alternative is wrong.
 | [discovery.md](discovery.md) | The served API surface, the tree built from it, custom resources |
 | [resources.md](resources.md) | Subscriptions, informers, the frontend cache, what a kind is |
 | [detail.md](detail.md) | The drawer: reads, server-side apply, scale, events, the dirty guard |
+| [metrics.md](metrics.md) | Sampling metrics.k8s.io, usage on a row, the cluster Overview |
 | [grid.md](grid.md) | `DataGrid`: selection, row actions, column layout, cell sizing |
 | [panels.md](panels.md) | The dock, the drawer and one resizer for all of them |
 | [logs.md](logs.md) | Log streaming, the scrollback buffer, search, backpressure |

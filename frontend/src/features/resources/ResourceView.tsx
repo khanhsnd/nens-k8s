@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useUsage, withUsage } from '@/features/metrics/usage'
 import { Placeholder } from '@/shared/ui/Placeholder'
 import type { Kind } from './kinds'
 import { useResources } from './resource.store'
@@ -25,8 +26,12 @@ export function ResourceView({
 }) {
   const slice = useResources((state) => state.slices[sliceKey])
   const objects = slice?.objects
+  const usage = useUsage(kind)
 
-  const rows = useMemo(() => [...(objects?.values() ?? [])].sort(compare), [objects])
+  const rows = useMemo(
+    () => [...(objects?.values() ?? [])].sort(compare).map((row) => withUsage(usage, row)),
+    [objects, usage],
+  )
 
   if (!slice) return <Placeholder label={`Connect a cluster to load ${kind.id}`} />
 

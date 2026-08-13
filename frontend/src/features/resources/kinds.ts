@@ -22,6 +22,8 @@ export type KindSpec = {
   shell?: boolean
   /** A node: its shell is a privileged pod entering the host's namespaces. */
   nodeShell?: boolean
+  /** Listed by metrics.k8s.io, so its rows carry CPU and memory usage. */
+  metrics?: boolean
   /** Owns pods with ports, so a local port can be forwarded to it. */
   forward?: boolean
 }
@@ -37,7 +39,13 @@ const core = (resource: string): GVR => ({ group: '', version: 'v1', resource })
 const at = (group: string, version: string, resource: string): GVR => ({ group, version, resource })
 
 export const KINDS: Record<string, KindSpec> = {
-  nodes: { gvr: core('nodes'), namespaced: false, columns: NODE_COLUMNS, nodeShell: true },
+  nodes: {
+    gvr: core('nodes'),
+    namespaced: false,
+    columns: NODE_COLUMNS,
+    metrics: true,
+    nodeShell: true,
+  },
   namespaces: { gvr: core('namespaces'), namespaced: false },
   events: { gvr: core('events'), namespaced: true },
 
@@ -45,6 +53,7 @@ export const KINDS: Record<string, KindSpec> = {
     gvr: core('pods'),
     namespaced: true,
     columns: POD_COLUMNS,
+    metrics: true,
     logs: true,
     shell: true,
     forward: true,

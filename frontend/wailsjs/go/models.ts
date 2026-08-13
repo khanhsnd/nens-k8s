@@ -223,6 +223,62 @@ export namespace domain {
 	        this.previous = source["previous"];
 	    }
 	}
+	export class Usage {
+	    name: string;
+	    namespace?: string;
+	    cpuMilli: number;
+	    memoryBytes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Usage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.namespace = source["namespace"];
+	        this.cpuMilli = source["cpuMilli"];
+	        this.memoryBytes = source["memoryBytes"];
+	    }
+	}
+	export class MetricsSample {
+	    clusterId: string;
+	    available: boolean;
+	    error?: string;
+	    nodes: Usage[];
+	    pods: Usage[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MetricsSample(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clusterId = source["clusterId"];
+	        this.available = source["available"];
+	        this.error = source["error"];
+	        this.nodes = this.convertValues(source["nodes"], Usage);
+	        this.pods = this.convertValues(source["pods"], Usage);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class OwnerRef {
 	    gvr: GVR;
 	    kind: string;
