@@ -96,7 +96,7 @@ wails build
 
 ## Donate 🙏
 
-This is a free side project and I'm shamelessly begging: if Nens saved you some `kubectl` typing, a coffee would be lovely. Ko-fi takes PayPal and cards, so one button covers both.
+This is a free side project
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/khanhsnd)
 
