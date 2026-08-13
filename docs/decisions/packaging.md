@@ -41,13 +41,22 @@ ends up everywhere. A tree built by hand keeps whatever the file says.
 `SettingsAPI.Version()` hands that string to the frontend. The status bar shows `Nens <version>`, and
 `dev` is what the browser preview and an unstamped build report.
 
-### The installer renames nothing
+### `name` and `outputfilename` are the same word
 
-`wails.json`'s `outputfilename` is `nens`, but NSIS's default `PRODUCT_EXECUTABLE` is
-`${INFO_PROJECTNAME}.exe` — `nens-k8s.exe` — and `wails_tools.nsh` installs the binary *under that
-name*. `project.nsi` defines `PRODUCT_EXECUTABLE "nens.exe"` so the installed program, the shortcut
-and the WebView2 data folder all match the binary that was built. `InstallDir` drops the company
-level for the same reason: `C:\Program Files\Nens\Nens` reads like a mistake.
+Both are `nens`, and they have to agree, because two platforms name things after `name` rather than
+after the binary Wails actually built:
+
+- macOS — `packageApplicationForDarwin` calls the bundle `<name>.app` and puts the `outputfilename`
+  binary inside it. When they differed, the release workflow built `nens-k8s.app` and then `ditto`
+  failed on the `nens.app` it was told to zip.
+- Windows — NSIS's `PRODUCT_EXECUTABLE` defaults to `${INFO_PROJECTNAME}.exe`, which
+  `wails_tools.nsh` fills in from `name`, and `wails.files` installs the built binary *under that
+  name*. When they differed, the installed program, the shortcut and the WebView2 data folder all
+  carried a name the exe did not have.
+
+So neither `project.nsi` nor the workflow overrides anything — keeping one word removes both
+problems at the source. `InstallDir` does drop the company level, for its own reason:
+`C:\Program Files\Nens\Nens` reads like a mistake.
 
 Uninstalling removes the program and the WebView2 data folder, and deliberately leaves
 `%AppData%/Nens` — settings, imported kubeconfigs and the log are the user's, not the installer's.

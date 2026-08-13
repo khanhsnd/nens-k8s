@@ -32,10 +32,6 @@ Unicode true
 ####
 ## Include the wails tools
 ####
-## The built binary is `nens.exe` (wails.json's outputfilename), not
-## `${INFO_PROJECTNAME}.exe` — without this the installer would rename it.
-!define PRODUCT_EXECUTABLE "nens.exe"
-
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts
