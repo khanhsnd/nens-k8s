@@ -36,12 +36,12 @@ go build ./...
 ```
 
 ```bash
-go test ./...
+go test ./internal/...
 ```
 
 `wails dev` runs the Go app with the Vite dev server (auto-detected port) and regenerates `frontend/wailsjs/` bindings on every rebuild. `wails generate module` regenerates the bindings alone — no window, no cluster access — use it after changing an API struct. To drive only the browser UI, `pnpm --dir frontend dev --port 5173 --strictPort` (this is what `.claude/launch.json` starts) — the Wails bridge is absent there, so stores fall back to fixtures.
 
-`go test ./...` covers the adapters against fakes — a fake dynamic client for `internal/kube/resource`, an `httptest` API server for `internal/kube/cluster` and `internal/update`, temp dirs for `internal/kube/kubeconfig` and `internal/config` (`t.Setenv` keeps the real `~/.kube/config` and `%AppData%` out of them). See `docs/decisions/testing.md`. There are no frontend tests.
+`go test ./internal/...` covers the adapters against fakes — the root package is excluded because its `//go:embed all:frontend/dist` cannot load before the frontend is built — a fake dynamic client for `internal/kube/resource`, an `httptest` API server for `internal/kube/cluster` and `internal/update`, temp dirs for `internal/kube/kubeconfig` and `internal/config` (`t.Setenv` keeps the real `~/.kube/config` and `%AppData%` out of them). See `docs/decisions/testing.md`. There are no frontend tests.
 
 `NENS_LOG_LEVEL=debug` raises both slog and Wails' own logger; the log is `%AppData%/Nens/nens.log`.
 

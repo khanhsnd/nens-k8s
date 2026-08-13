@@ -24,5 +24,12 @@ closes.
 own release feed, installer and `checksums.txt` from an `httptest` server; what it cannot
 cover is `startInstaller`, which hands a real exe to the shell.
 
+The test command is `go test ./internal/...`, not `./...`. The root package embeds
+`all:frontend/dist`, so it fails to load whenever the frontend has not been built — which
+is the state of a fresh clone and of the release workflow, where tests run before
+`wails build`. Committing a placeholder into `frontend/dist` does not help: `vite build`
+empties the out dir and skips only `.git`, so the placeholder disappears on the first local
+build. Root-package compilation is still checked, by `wails build` itself.
+
 Never point tests — or manual runs — at the maintainer's kubeconfig contexts without
 explicit permission.
