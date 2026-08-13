@@ -11,6 +11,7 @@ import (
 	"nens-k8s/internal/kube/discovery"
 	"nens-k8s/internal/kube/exec"
 	"nens-k8s/internal/kube/forward"
+	"nens-k8s/internal/kube/helm"
 	"nens-k8s/internal/kube/kubeconfig"
 	"nens-k8s/internal/kube/logs"
 	"nens-k8s/internal/kube/metrics"
@@ -30,6 +31,7 @@ type App struct {
 	logs        *LogAPI
 	shells      *ExecAPI
 	forwards    *PortForwardAPI
+	helm        *HelmAPI
 	settings    *SettingsAPI
 
 	ctx context.Context
@@ -52,6 +54,7 @@ func New() *App {
 		logs:        NewLogAPI(logs.NewStreamer(registry, bus)),
 		shells:      NewExecAPI(exec.NewRunner(registry, bus)),
 		forwards:    NewPortForwardAPI(forward.NewRegistry(registry, bus, store)),
+		helm:        NewHelmAPI(helm.NewClient(registry)),
 		settings:    NewSettingsAPI(store, fonts.NewSource()),
 	}
 }
@@ -86,6 +89,7 @@ func (a *App) Bindings() []any {
 		a.logs,
 		a.shells,
 		a.forwards,
+		a.helm,
 		a.settings,
 	}
 }

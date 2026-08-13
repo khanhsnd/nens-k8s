@@ -1,22 +1,10 @@
 import { CornerDownRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ForwardPanel } from '@/features/portforward/ForwardPanel'
+import { Field, Heading } from '@/shared/ui/Field'
 import type { Kind } from './kinds'
 import { listOwners } from './object.api'
 import type { K8sObject, OwnerRef, ResourceRef } from './resource.types'
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[110px_1fr] gap-3 py-1.5">
-      <dt className="text-faint">{label}</dt>
-      <dd className="truncate font-mono text-sm">{value}</dd>
-    </div>
-  )
-}
-
-function Heading({ children }: { children: string }) {
-  return <div className="text-xs uppercase tracking-wide text-faint">{children}</div>
-}
 
 function OwnerChain({ owners }: { owners: OwnerRef[] }) {
   return (

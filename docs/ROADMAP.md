@@ -36,6 +36,9 @@ Exit: Pods, Deployments, Nodes, Services, ConfigMaps live. Verified against fixt
 - Owner-reference chain in Overview (pod → replicaset → deployment).
 - Events tab filtered by `involvedObject.uid`, newest first.
 - Delete and Scale live in the drawer header menu.
+- Creating is the same forced apply: the table's New button opens a YAML template built from
+  the GVR plus a per-kind body (`templates.ts`), and the informer delivers the new row. Shown
+  only when discovery named the Kind and reported the `create` verb.
 
 Exit: verified against fixtures (browser dev server) and the fake dynamic client. The write paths
 (`Apply`, `Delete`, `Scale`) have never run against a real API server.
@@ -122,10 +125,31 @@ unavailable path. `metrics.k8s.io` has never been listed against a real API serv
 were again impossible in the headless browser pane, so the layout was verified through the DOM
 and computed styles in both themes.
 
-## Phase 8 — Helm
+## Phase 8 — Helm (done)
 
-- `helm.sh/helm/v3/pkg/action` for list/get/history/rollback/uninstall.
-- Values diff view between revisions.
+- `internal/kube/helm.Client`: `helm.sh/helm/v3/pkg/action` for list/get/history/rollback/
+  uninstall, over an `action.Configuration` built per call from the cluster connection —
+  helm's `RESTClientGetter` is the connection, and the Secret storage driver is the
+  connection's own clientset. `HelmAPI.Releases` / `History` / `Detail` / `Rollback` /
+  `Uninstall`. `domain.HelmClient` is the only port with no `context.Context`, because
+  helm's action API takes none.
+- A release is not a kind — no GVR, no UID, no informer — so `AppShell` renders
+  `features/helm` from the leaf id and the view owns its fetch and its drawer, like Port
+  Forwarding. Nothing watches: `helm.store.ts` reads on open, on cluster change, after its
+  own writes and on Refresh.
+- The drawer is Overview / Values / Manifest / Notes / History; History lists every revision
+  with rollback and compare, and the compare view diffs any two revisions' values *or*
+  manifest — a release on the chart's defaults has no values to diff, so both are offered.
+- `shared/lib/diff.ts` + `shared/ui/DiffView.tsx`: common head and tail matched first, LCS
+  over what is left, unified rendering because the drawer is too narrow for two panes.
+  Above two million cells it stops aligning and says so.
+- The "Charts" nav leaf was removed: repositories and install are their own feature, and a
+  leaf that opens "not wired up yet" is worse than no leaf.
+
+Exit: verified against fixtures (browser dev server) — list, drawer tabs, history, values
+and manifest diffs, rollback and uninstall — and against `client-go`'s fake clientset seeded
+through helm's own storage driver. `Rollback` and `Uninstall` have never run against a real
+API server; both go through helm's kube client, which a fake cannot stand in for.
 
 ## Phase 9 — Production hardening
 

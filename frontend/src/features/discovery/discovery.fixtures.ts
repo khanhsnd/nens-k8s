@@ -68,6 +68,11 @@ const CUSTOM: Record<string, Array<[string, string, boolean, PrinterColumn[]?]>>
     ],
     ['appprojects', 'AppProject', true],
   ],
+  // Same vendor, second group — the sidebar folds both under `cert-manager`.
+  'acme.cert-manager.io/v1': [
+    ['challenges', 'Challenge', true],
+    ['orders', 'Order', true],
+  ],
   'cert-manager.io/v1': [
     [
       'certificates',
@@ -103,7 +108,7 @@ function flatten(
       kind,
       namespaced,
       custom,
-      verbs: ['get', 'list', 'watch'],
+      verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete'],
       columns,
     }))
   })

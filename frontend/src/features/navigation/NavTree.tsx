@@ -26,7 +26,7 @@ function Section({ section, forceOpen }: { section: NavSection; forceOpen: boole
           className={cn('size-3.5 shrink-0 text-faint transition-transform', open && 'rotate-90')}
         />
         <Icon className="size-4 shrink-0" />
-        <span title={section.label} className="flex-1 truncate text-sm">
+        <span title={section.hint ?? section.label} className="flex-1 truncate text-sm">
           {section.label}
         </span>
       </button>
@@ -64,11 +64,12 @@ export function NavTree({ query }: { query: string }) {
   const needle = query.trim().toLowerCase()
 
   // A section whose own label matches keeps all of its children: typing the API
-  // group of a CRD is how you look for its kinds.
+  // group of a CRD is how you look for its kinds — which is why the groups a
+  // vendor section stands for are searched too, not only its shortened label.
   const sections = needle
     ? all
         .map((section) =>
-          section.label.toLowerCase().includes(needle)
+          `${section.label} ${section.hint ?? ''}`.toLowerCase().includes(needle)
             ? section
             : {
                 ...section,

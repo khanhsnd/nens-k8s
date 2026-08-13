@@ -1,7 +1,8 @@
-import { Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { DataGrid } from '@/shared/ui/DataGrid'
-import type { Kind } from './kinds'
+import { CreateDialog } from './CreateDialog'
+import { canCreate, type Kind } from './kinds'
 import { useNamespaceFilter } from './namespace.store'
 import { NamespaceFilter } from './NamespaceFilter'
 import type { K8sObject } from './resource.types'
@@ -21,6 +22,7 @@ export function ResourceTable({
 }) {
   const [query, setQuery] = useState('')
   const [chosen, setChosen] = useNamespaceFilter()
+  const [creating, setCreating] = useState(false)
 
   const namespaces = useMemo(
     () => [...new Set(rows.map((row) => row.metadata.namespace ?? ''))].filter(Boolean).sort(),
@@ -56,8 +58,29 @@ export function ResourceTable({
           <NamespaceFilter namespaces={namespaces} value={chosen} onChange={setChosen} />
         )}
 
+        {canCreate(kind) && (
+          <button
+            onClick={() => setCreating(true)}
+            title={`New ${kind.kind}`}
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-2.5 py-1.5 text-sm font-medium text-base transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" />
+            New {kind.kind}
+          </button>
+        )}
+
         {notice && <div className="ml-auto truncate text-xs">{notice}</div>}
       </div>
+
+      {creating && (
+        // The filter is where the user already said which namespace they mean; a
+        // filter over several has no single answer, so the template falls back.
+        <CreateDialog
+          kind={kind}
+          namespace={chosen.length === 1 ? chosen[0] : ''}
+          onClose={() => setCreating(false)}
+        />
+      )}
 
       <DataGrid
         layoutId={kind.id}

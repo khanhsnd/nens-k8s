@@ -14,6 +14,8 @@ function resolve(id: string, spec: KindSpec, served?: ApiResource): Kind {
     id,
     gvr: served?.gvr ?? spec.gvr,
     namespaced,
+    kind: served?.kind ?? '',
+    verbs: served?.verbs ?? [],
     columns: spec.columns ?? genericColumns(namespaced, served?.columns),
   }
 }
@@ -39,6 +41,8 @@ function build(resources: ApiResource[]): Map<string, Kind> {
       id: customKindId(resource),
       gvr: resource.gvr,
       namespaced: resource.namespaced,
+      kind: resource.kind,
+      verbs: resource.verbs,
       columns: genericColumns(resource.namespaced, resource.columns),
     })
   }

@@ -7,6 +7,7 @@ import {
 import { clusterResources, useDiscovery } from '@/features/discovery/discovery.store'
 import { Dock } from '@/features/dock/Dock'
 import { useDock } from '@/features/dock/dock.store'
+import { HelmView } from '@/features/helm/HelmView'
 import { subscribeLogEvents } from '@/features/logs/log.store'
 import { useMetrics } from '@/features/metrics/metrics.store'
 import { useUsage, withUsage } from '@/features/metrics/usage'
@@ -109,6 +110,10 @@ export function AppShell() {
     if (tab.leafId === 'overview') {
       if (!clusterId) return <Placeholder label="Select a cluster to see its overview" />
       return <OverviewView clusterId={clusterId} />
+    }
+    if (tab.leafId === 'releases') {
+      if (!clusterId) return <Placeholder label="Select a cluster to see its Helm releases" />
+      return <HelmView clusterId={clusterId} />
     }
     if (!kind) return <Placeholder label={`${tab.title} — not wired up yet`} />
     if (!key) return <Placeholder label="Select a cluster to load resources" />

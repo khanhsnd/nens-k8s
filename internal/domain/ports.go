@@ -62,6 +62,16 @@ type MetricsSampler interface {
 	Sample(ctx context.Context, clusterID string) (MetricsSample, error)
 }
 
+// HelmClient takes no context: helm's action API accepts none, and a parameter
+// this adapter could only ignore would promise a cancellation it cannot deliver.
+type HelmClient interface {
+	Releases(clusterID string) ([]HelmRelease, error)
+	History(ref HelmRef) ([]HelmRelease, error)
+	Detail(ref HelmRef, revision int) (HelmDetail, error)
+	Rollback(ref HelmRef, revision int) error
+	Uninstall(ref HelmRef) error
+}
+
 type ResourceEditor interface {
 	Get(ctx context.Context, ref ResourceRef) (map[string]any, error)
 	Apply(ctx context.Context, ref ResourceRef, object map[string]any) (map[string]any, error)

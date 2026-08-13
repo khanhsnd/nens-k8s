@@ -17,5 +17,6 @@ especially when the obvious alternative is wrong.
 | [logs.md](logs.md) | Log streaming, the scrollback buffer, search, backpressure |
 | [terminal.md](terminal.md) | Exec sessions, xterm, the node shell |
 | [portforward.md](portforward.md) | The forward registry, its view and its persistence |
+| [helm.md](helm.md) | Releases, revisions, the values diff, rollback and uninstall |
 | [settings.md](settings.md) | What is stored where, appearance, fonts, remembered state |
 | [testing.md](testing.md) | What the tests run against, and what they must never touch |

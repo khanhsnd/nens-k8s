@@ -85,6 +85,43 @@ survives that bump.
 `catalog()` is memoised on the discovered array with a `WeakMap`, so the join runs once per
 discovery rather than once per render.
 
+### A custom leaf is labelled with the plural Kind
+
+Discovery answers with `kind`, which is singular — "Order" and "Challenge" sitting under
+`acme.cert-manager.io` while every curated leaf above them says "Pods", "Deployments",
+"Releases". The label is therefore the Kind put through Kubernetes' own singular → plural
+rule (`s/x/z/ch/sh` → `es`, consonant + `y` → `ies`, otherwise `s`): "Orders",
+"NetworkPolicies", "Prometheuses".
+
+The plural is *not* taken from `gvr.resource`, which is already plural and would be free:
+it is lowercased, so `networkpolicies` and `servicemonitors` lose the word boundaries the
+Kind still has. Pluralising costs four lines and keeps "ServiceMonitors" readable.
+
+### The section is the vendor, not the group
+
+A section per API group is what discovery hands you, and on a real cluster that is a column
+of hostnames — `acme.cert-manager.io`, `cert-manager.io`, `configuration.konghq.com`,
+`crd.projectcalico.org`, `monitoring.coreos.com` — appearing the moment a cluster connects.
+Half of them are the *same product*: a group is a domain its vendor owns, and one install
+routinely owns several.
+
+So the section is the registrable domain (the last two labels of the group) and its label is
+that domain's first label: `cert-manager`, `konghq`, `projectcalico`, `coreos`. Both
+cert-manager groups fold into one section, and the wall becomes one entry per thing actually
+installed.
+
+Nothing is lost, because nothing is thrown away:
+
+- the section's tooltip lists the groups it stands for, and the sidebar filter matches them,
+  so typing `acme.cert-manager.io` still finds Orders;
+- the leaf id is still `crd:<group>/<resource>`, so a tab still resolves by the full group;
+- two groups of one vendor serving the same Kind — the one case where a label would be
+  ambiguous — get the group appended to the label.
+
+Shortening a name is a guess when the name is arbitrary. It is not one here: the domain is
+structured, and the part before the public suffix is exactly the vendor's own name for
+itself.
+
 ### A custom resource tab carries its own title
 
 `tab.store` rebuilt every title from `nav.model`, which a custom kind is not in. `makeTab`

@@ -32,7 +32,14 @@ export type KindSpec = {
 export type Kind = KindSpec & {
   id: string
   columns: ResourceColumn[]
+  /** The API Kind ("Deployment"), from discovery — empty when no cluster has said. */
+  kind: string
+  /** What the cluster says may be done with it; empty when no cluster has said. */
+  verbs: string[]
 }
+
+/** Creating needs a template, and a template needs the Kind discovery named. */
+export const canCreate = (kind: Kind) => kind.kind !== '' && kind.verbs.includes('create')
 
 const core = (resource: string): GVR => ({ group: '', version: 'v1', resource })
 

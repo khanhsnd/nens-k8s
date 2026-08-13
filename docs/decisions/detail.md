@@ -44,6 +44,25 @@ the browser. Go marshals maps with sorted keys, which is exactly what `kubectl g
 so nothing is lost — and parse errors surface in the drawer before a round trip, while fixture mode
 gets a YAML tab for free.
 
+### Creating is the same apply, and a template is data
+
+A forced server-side apply creates what is not there yet, so the New button on a table needs no
+new binding and no `Create` on the port: `CreateDialog` parses the document, builds a
+`ResourceRef` from the table's GVR plus the document's name and namespace, and calls the same
+`Apply` the YAML tab does. The row then arrives from the informer that is already watching —
+nothing refreshes anything.
+
+The endpoint comes from the table, not from the document, so a pasted object of another kind
+would be applied to the wrong resource. The dialog rejects that mismatch itself, because the API
+server's answer for it ("no kind Service is registered…") reads like a bug in Nens.
+
+`templates.ts` follows the same rule as columns: the head (`apiVersion`, `kind`, `metadata`) is
+computed from the GVR and the scope discovery served, and only the body below it is per-kind
+data. A kind with no entry — every custom resource — still gets a valid head to fill in, which
+is why the button only needs discovery to have named the Kind. It is also gated on the `create`
+verb discovery reported, which is what the *resource* supports, not what this user is allowed
+to do: RBAC is only ever answered by trying, and a Forbidden lands in the dialog.
+
 ### The dirty guard is a store, not a prop
 
 `features/resources/editor.store.ts` holds `dirty` plus one `pending` action. Anything that would

@@ -44,13 +44,14 @@ const highlight = HighlightStyle.define([
   { tag: tags.meta, color: 'var(--color-faint)' },
 ])
 
+/** Read-only when nobody wants the changes: no `onChange`, no editing. */
 export function CodeEditor({
   value,
   onChange,
   onSave,
 }: {
   value: string
-  onChange: (text: string) => void
+  onChange?: (text: string) => void
   onSave?: () => void
 }) {
   const host = useRef<HTMLDivElement>(null)
@@ -67,6 +68,8 @@ export function CodeEditor({
           yaml(),
           theme,
           syntaxHighlighting(highlight),
+          EditorState.readOnly.of(!onChange),
+          EditorView.editable.of(Boolean(onChange)),
           Prec.highest(
             keymap.of([
               {
@@ -80,7 +83,7 @@ export function CodeEditor({
             ]),
           ),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) handlers.current.onChange(update.state.doc.toString())
+            if (update.docChanged) handlers.current.onChange?.(update.state.doc.toString())
           }),
         ],
       }),

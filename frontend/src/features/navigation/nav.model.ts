@@ -9,6 +9,8 @@ export type NavLeaf = {
 export type NavSection = {
   id: string
   label: string
+  /** The long form behind a shortened label: shown on hover, matched by the filter. */
+  hint?: string
   icon: ComponentType<{ className?: string }>
   children: NavLeaf[]
 }
@@ -85,10 +87,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: 'helm',
     label: 'Helm',
     icon: Ship,
-    children: [
-      { id: 'releases', label: 'Releases' },
-      { id: 'charts', label: 'Charts' },
-    ],
+    children: [{ id: 'releases', label: 'Releases' }],
   },
   {
     id: 'access',
