@@ -3,7 +3,7 @@ import { cn } from '@/shared/lib/cn'
 
 export type Tone = 'neutral' | 'ok' | 'warn' | 'danger' | 'info'
 
-const TONES: Record<Tone, string> = {
+export const TONES: Record<Tone, string> = {
   neutral: 'text-muted',
   ok: 'text-ok',
   warn: 'text-warn',
@@ -11,7 +11,8 @@ const TONES: Record<Tone, string> = {
   info: 'text-info',
 }
 
-const PILLS: Record<Tone, string> = {
+/** Border, wash and text of a tone — anything chip-shaped is tinted with these. */
+export const TINTS: Record<Tone, string> = {
   neutral: 'border-line-strong text-faint',
   ok: 'border-ok/40 bg-ok/10 text-ok',
   warn: 'border-warn/40 bg-warn/10 text-warn',
@@ -46,7 +47,7 @@ export function Pill({
       className={cn(
         'inline-flex h-[1.7em] max-w-full items-center gap-1 truncate rounded-full border px-1.5 align-middle text-2xs leading-none',
         mono ? 'font-mono' : 'uppercase tracking-wide',
-        PILLS[tone],
+        TINTS[tone],
       )}
     >
       {children}

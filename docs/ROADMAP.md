@@ -186,6 +186,26 @@ real binary — `nens.log` shows the startup, the webview bridge and a real conn
 actual GitHub release (none published yet), `startInstaller`, and the NSIS build itself, which needs
 `makensis` on PATH.
 
+## Phase 10 — Topology (done)
+
+- `features/topology`: a graph of the cluster built from the informer caches alone —
+  Ingress → Service → Workload → Pod → Node as columns, one namespace per lane, ordered
+  by barycentre sweeps. No new backend, no new dependency, no new fetch.
+- A view rather than a kind, like the Overview and Helm: `AppShell` renders it from the
+  leaf id and expands its tab into `TOPOLOGY_KINDS`. `replicasets` is subscribed but never
+  drawn — it is how a pod reaches its Deployment.
+- Pods fold into their workload until asked for; placement edges are drawn only for what
+  is hovered or selected; a Service edge lands on the workload whose pod template its
+  selector matches. Past `MAX_NODES` the view asks for a namespace instead of drawing.
+- Clicking any card opens the same detail drawer, so `AppShell`'s selection carries its
+  own kind rather than borrowing the open tab's. See `decisions/topology.md`.
+
+Exit: verified against fixtures (browser dev server) — layout with no overlaps, expand and
+collapse, namespace scoping, search highlighting, hover focus with placement counts, the
+drawer opening on a Node from the graph and on a Pod from the table, and both themes
+through computed styles. Screenshots remain impossible in the headless browser pane. The
+graph has never been built from a real cluster's caches.
+
 ## Performance budget
 
 Enforce these as the app grows:

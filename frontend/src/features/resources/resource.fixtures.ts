@@ -5,9 +5,40 @@ const NAMESPACES = ['default', 'kube-system', 'monitoring', 'ingress-nginx', 'ar
 const APPS = ['api-gateway', 'auth-svc', 'billing', 'worker', 'redis', 'postgres', 'nginx', 'otel-collector']
 const PHASES = ['Running', 'Running', 'Running', 'Running', 'Pending', 'CrashLoopBackOff'] as const
 
+/** Not every app is a Deployment — the topology draws all three the same way. */
+const CONTROLLERS: Record<string, string> = {
+  redis: 'StatefulSet',
+  postgres: 'StatefulSet',
+  'otel-collector': 'DaemonSet',
+}
+
+const controllerOf = (app: string) => CONTROLLERS[app] ?? 'Deployment'
+
+const appLabels = (app: string) => ({ 'app.kubernetes.io/name': app })
+
 function hash(seed: number) {
   const value = Math.sin(seed) * 10000
   return value - Math.floor(value)
+}
+
+/** A ReplicaSet's name is its Deployment plus a stable hash of where it runs. */
+function replicaSetName(app: string, namespace: string): string {
+  let value = 0
+  for (const character of `${app}/${namespace}`) {
+    value = (value * 31 + character.charCodeAt(0)) % 1_000_000
+  }
+  return `${app}-${value.toString(36).padStart(4, '0').slice(-4)}`
+}
+
+/** Every (app, namespace) pair a controller of this kind owns. */
+function spread(kind: string): Array<{ app: string; namespace: string; seed: number }> {
+  return APPS.filter((app) => controllerOf(app) === kind).flatMap((app, index) =>
+    NAMESPACES.map((namespace, offset) => ({
+      app,
+      namespace,
+      seed: index * NAMESPACES.length + offset,
+    })),
+  )
 }
 
 function meta(name: string, seed: number, namespace?: string): K8sObject['metadata'] {
@@ -37,14 +68,19 @@ function makePods(count = 800): K8sObject[] {
     const phase = PHASES[Math.floor(hash(index) * PHASES.length)]
     const name = `${app}-${(7000 + index).toString(36)}-${Math.floor(hash(index * 3) * 99999).toString(36)}`
 
+    const kind = controllerOf(app)
+    const owner =
+      kind === 'Deployment'
+        ? { kind: 'ReplicaSet', name: replicaSetName(app, namespace), controller: true }
+        : { kind, name: app, controller: true }
+
     return {
       apiVersion: 'v1',
       kind: 'Pod',
       metadata: {
         ...meta(name, index, namespace),
-        ownerReferences: [
-          { kind: 'ReplicaSet', name: `${app}-${(7000 + index).toString(36)}`, controller: true },
-        ],
+        labels: appLabels(app),
+        ownerReferences: [owner],
       },
       spec: {
         nodeName: `node-${(index % 6) + 1}.sgn.internal`,
@@ -68,27 +104,72 @@ function makePods(count = 800): K8sObject[] {
   })
 }
 
-function makeDeployments(): K8sObject[] {
-  return APPS.flatMap((app, index) =>
-    NAMESPACES.slice(0, 3).map((namespace, offset) => {
-      const seed = index * 5 + offset
-      const replicas = (seed % 4) + 1
-      const ready = seed % 7 === 0 ? replicas - 1 : replicas
+function template(app: string, seed: number) {
+  return {
+    metadata: { labels: appLabels(app) },
+    spec: { containers: [{ name: app, image: `registry.internal/${app}:1.${seed % 9}.0` }] },
+  }
+}
 
-      return {
-        apiVersion: 'apps/v1',
-        kind: 'Deployment',
-        metadata: meta(app, seed, namespace),
-        spec: {
-          replicas,
-          template: {
-            spec: { containers: [{ name: app, image: `registry.internal/${app}:1.${seed % 9}.0` }] },
-          },
-        },
-        status: { readyReplicas: ready, updatedReplicas: replicas, availableReplicas: ready },
-      }
-    }),
-  )
+function makeDeployments(): K8sObject[] {
+  return spread('Deployment').map(({ app, namespace, seed }) => {
+    const replicas = (seed % 4) + 1
+    const ready = seed % 7 === 0 ? replicas - 1 : replicas
+
+    return {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: meta(app, seed, namespace),
+      spec: {
+        replicas,
+        selector: { matchLabels: appLabels(app) },
+        template: template(app, seed),
+      },
+      status: { readyReplicas: ready, updatedReplicas: replicas, availableReplicas: ready },
+    }
+  })
+}
+
+function makeReplicaSets(): K8sObject[] {
+  return spread('Deployment').map(({ app, namespace, seed }) => ({
+    apiVersion: 'apps/v1',
+    kind: 'ReplicaSet',
+    metadata: {
+      ...meta(replicaSetName(app, namespace), seed, namespace),
+      ownerReferences: [{ kind: 'Deployment', name: app, controller: true }],
+    },
+    spec: { replicas: (seed % 4) + 1, selector: { matchLabels: appLabels(app) } },
+    status: { readyReplicas: (seed % 4) + 1 },
+  }))
+}
+
+function makeStatefulSets(): K8sObject[] {
+  return spread('StatefulSet').map(({ app, namespace, seed }) => {
+    const replicas = (seed % 3) + 1
+
+    return {
+      apiVersion: 'apps/v1',
+      kind: 'StatefulSet',
+      metadata: meta(app, seed, namespace),
+      spec: {
+        replicas,
+        serviceName: app,
+        selector: { matchLabels: appLabels(app) },
+        template: template(app, seed),
+      },
+      status: { readyReplicas: seed % 5 === 0 ? replicas - 1 : replicas },
+    }
+  })
+}
+
+function makeDaemonSets(): K8sObject[] {
+  return spread('DaemonSet').map(({ app, namespace, seed }) => ({
+    apiVersion: 'apps/v1',
+    kind: 'DaemonSet',
+    metadata: meta(app, seed, namespace),
+    spec: { selector: { matchLabels: appLabels(app) }, template: template(app, seed) },
+    status: { desiredNumberScheduled: 6, numberReady: seed % 4 === 0 ? 4 : 6 },
+  }))
 }
 
 const NODE_SIZES = [
@@ -157,16 +238,57 @@ function makeEvents(): K8sObject[] {
 }
 
 function makeServices(): K8sObject[] {
-  return APPS.map((app, index) => ({
-    apiVersion: 'v1',
-    kind: 'Service',
-    metadata: meta(app, index, NAMESPACES[index % NAMESPACES.length]),
+  return APPS.flatMap((app, index) =>
+    NAMESPACES.map((namespace, offset) => {
+      const seed = index * NAMESPACES.length + offset
+
+      return {
+        apiVersion: 'v1',
+        kind: 'Service',
+        metadata: meta(app, seed, namespace),
+        spec: {
+          type: seed === 0 ? 'LoadBalancer' : seed % 7 === 0 ? 'NodePort' : 'ClusterIP',
+          clusterIP: `10.96.${index}.${offset + 5}`,
+          // A service with no selector is the "selects nothing" case the
+          // topology paints as a warning.
+          selector: seed % 11 === 0 ? undefined : appLabels(app),
+          ports: [{ port: 80, protocol: 'TCP', nodePort: seed % 7 === 0 ? 30000 + seed : undefined }],
+        },
+        status: seed === 0 ? { loadBalancer: { ingress: [{ ip: '10.20.0.200' }] } } : {},
+      }
+    }),
+  )
+}
+
+const ROUTES: Array<[string, string, string]> = [
+  ['public', 'default', 'api-gateway'],
+  ['auth', 'default', 'auth-svc'],
+  ['metrics', 'monitoring', 'otel-collector'],
+  ['checkout', 'default', 'checkout'],
+]
+
+function makeIngresses(): K8sObject[] {
+  return ROUTES.map(([name, namespace, service], index) => ({
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'Ingress',
+    metadata: meta(name, index, namespace),
     spec: {
-      type: index === 0 ? 'LoadBalancer' : index % 3 === 0 ? 'NodePort' : 'ClusterIP',
-      clusterIP: `10.96.${index}.${index + 5}`,
-      ports: [{ port: 80, protocol: 'TCP', nodePort: index % 3 === 0 ? 30000 + index : undefined }],
+      ingressClassName: 'nginx',
+      rules: [
+        {
+          host: `${name}.nens.internal`,
+          http: {
+            paths: [
+              {
+                path: '/',
+                pathType: 'Prefix',
+                backend: { service: { name: service, port: { number: 80 } } },
+              },
+            ],
+          },
+        },
+      ],
     },
-    status: index === 0 ? { loadBalancer: { ingress: [{ ip: '10.20.0.200' }] } } : {},
   }))
 }
 
@@ -217,9 +339,13 @@ function makeApplications(): K8sObject[] {
 const BUILDERS: Record<string, () => K8sObject[]> = {
   pods: makePods,
   deployments: makeDeployments,
+  replicasets: makeReplicaSets,
+  statefulsets: makeStatefulSets,
+  daemonsets: makeDaemonSets,
   nodes: makeNodes,
   events: makeEvents,
   services: makeServices,
+  ingresses: makeIngresses,
   configmaps: makeConfigMaps,
   definitions: makeDefinitions,
   'crd:argoproj.io/applications': makeApplications,
@@ -234,6 +360,13 @@ export function fixtureObjects(kindId: string): K8sObject[] {
 
 const apps = (resource: string) => ({ group: 'apps', version: 'v1', resource })
 
+const RESOURCE_OF: Record<string, string> = {
+  ReplicaSet: 'replicasets',
+  StatefulSet: 'statefulsets',
+  DaemonSet: 'daemonsets',
+  Deployment: 'deployments',
+}
+
 export function fixtureOwners(object: K8sObject): OwnerRef[] {
   const owner = object.metadata.ownerReferences?.[0]
   if (!owner) return []
@@ -241,7 +374,7 @@ export function fixtureOwners(object: K8sObject): OwnerRef[] {
   const namespace = object.metadata.namespace ?? ''
   const chain: OwnerRef[] = [
     {
-      gvr: apps('replicasets'),
+      gvr: apps(RESOURCE_OF[owner.kind] ?? 'replicasets'),
       kind: owner.kind,
       name: owner.name,
       namespace,

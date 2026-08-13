@@ -12,6 +12,7 @@ especially when the obvious alternative is wrong.
 | [resources.md](resources.md) | Subscriptions, informers, the frontend cache, what a kind is |
 | [detail.md](detail.md) | The drawer: reads, server-side apply, scale, events, the dirty guard |
 | [metrics.md](metrics.md) | Sampling metrics.k8s.io, usage on a row, the cluster Overview |
+| [topology.md](topology.md) | The cluster graph: layers, lanes, which edges are drawn when |
 | [grid.md](grid.md) | `DataGrid`: selection, row actions, column layout, cell sizing |
 | [panels.md](panels.md) | The dock, the drawer and one resizer for all of them |
 | [logs.md](logs.md) | Log streaming, the scrollback buffer, search, backpressure |

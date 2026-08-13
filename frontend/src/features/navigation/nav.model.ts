@@ -27,6 +27,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Gauge,
     children: [
       { id: 'overview', label: 'Overview' },
+      { id: 'topology', label: 'Topology' },
       { id: 'nodes', label: 'Nodes' },
       { id: 'namespaces', label: 'Namespaces' },
       { id: 'events', label: 'Events' },

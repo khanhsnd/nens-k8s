@@ -24,6 +24,8 @@ import { ResourceView } from '@/features/resources/ResourceView'
 import { TabBar } from '@/features/tabs/TabBar'
 import { subscribeExecEvents } from '@/features/terminal/terminal.store'
 import { activeTab, useTabs } from '@/features/tabs/tab.store'
+import { TOPOLOGY_KINDS } from '@/features/topology/topology.model'
+import { TopologyView, type Selection } from '@/features/topology/TopologyView'
 import { cn } from '@/shared/lib/cn'
 import { Placeholder } from '@/shared/ui/Placeholder'
 import { CommandPalette } from './CommandPalette'
@@ -31,6 +33,12 @@ import { DetailDrawer } from './DetailDrawer'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
 import { TopBar } from './TopBar'
+
+/** A leaf that reads several kinds instead of being one — see `overview.model`. */
+const VIEW_KINDS: Record<string, string[]> = {
+  overview: OVERVIEW_KINDS,
+  topology: TOPOLOGY_KINDS,
+}
 
 export function AppShell() {
   const load = useClusters((s) => s.load)
@@ -45,7 +53,7 @@ export function AppShell() {
   const follow = useMetrics((s) => s.follow)
   const dockMaximized = useDock((s) => s.maximized)
 
-  const [selected, setSelected] = useState<{ key: string; uid: string } | null>(null)
+  const [selected, setSelected] = useState<Selection | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
 
   useEffect(() => {
@@ -73,12 +81,12 @@ export function AppShell() {
     void useForwards.getState().sync(connected)
   }, [clusters])
 
-  // One tab is one leaf, except Overview, which reads several — so the wanted
+  // One tab is one leaf, except the views that read several — so the wanted
   // kinds are deduplicated: subscribing the same slice twice would leak a token.
   useEffect(() => {
     const kinds = new Map<string, Kind>()
     for (const item of tabs) {
-      for (const leafId of item.leafId === 'overview' ? OVERVIEW_KINDS : [item.leafId]) {
+      for (const leafId of VIEW_KINDS[item.leafId] ?? [item.leafId]) {
         const kind = kindFor(leafId, resources)
         if (kind) kinds.set(kind.id, kind)
       }
@@ -87,18 +95,24 @@ export function AppShell() {
   }, [clusterId, phase, tabs, resources, sync])
 
   const kind = tab ? kindFor(tab.leafId, resources) : null
-  const key = clusterId && kind ? sliceKey(clusterId, kind.id) : null
+
+  // The selection carries its own kind, because the topology hands back objects
+  // of every kind — but a table still only owns the rows it drew.
+  const selectedKind = selected ? kindFor(selected.kindId, resources) : null
+  const owned = tab?.leafId === 'topology' || (selected !== null && selected.kindId === kind?.id)
+  const selectedKey = clusterId && selected && owned ? sliceKey(clusterId, selected.kindId) : null
   const selectedObject = useResources((s) =>
-    selected && selected.key === key ? s.slices[key]?.objects.get(selected.uid) : undefined,
+    selectedKey ? s.slices[selectedKey]?.objects.get(selected!.uid) : undefined,
   )
 
   // Nothing polls metrics.k8s.io unless what is on screen shows usage.
-  const wantsMetrics = tab?.leafId === 'overview' || Boolean(kind?.metrics)
+  const wantsMetrics =
+    tab?.leafId === 'overview' || tab?.leafId === 'topology' || Boolean(kind?.metrics)
   useEffect(() => {
     follow(wantsMetrics && phase === 'connected' ? clusterId : null)
   }, [follow, wantsMetrics, phase, clusterId])
 
-  const usage = useUsage(kind)
+  const usage = useUsage(selectedKind)
   const detail = useMemo(
     () => selectedObject && withUsage(usage, selectedObject),
     [selectedObject, usage],
@@ -115,18 +129,28 @@ export function AppShell() {
       if (!clusterId) return <Placeholder label="Select a cluster to see its Helm releases" />
       return <HelmView clusterId={clusterId} />
     }
+    if (tab.leafId === 'topology') {
+      if (!clusterId) return <Placeholder label="Select a cluster to see its topology" />
+      return (
+        <TopologyView
+          clusterId={clusterId}
+          selected={selected}
+          onSelect={(pick) => guard(() => setSelected(pick))}
+        />
+      )
+    }
     if (!kind) return <Placeholder label={`${tab.title} — not wired up yet`} />
-    if (!key) return <Placeholder label="Select a cluster to load resources" />
+    if (!clusterId) return <Placeholder label="Select a cluster to load resources" />
 
     return (
       <ResourceView
         kind={kind}
-        sliceKey={key}
-        selectedUid={selected?.key === key ? selected.uid : null}
+        sliceKey={sliceKey(clusterId, kind.id)}
+        selectedUid={selected?.kindId === kind.id ? selected.uid : null}
         onSelect={(row) =>
           guard(() =>
             setSelected((current) =>
-              current?.uid === row.metadata.uid ? null : { key, uid: row.metadata.uid },
+              current?.uid === row.metadata.uid ? null : { kindId: kind.id, uid: row.metadata.uid },
             ),
           )
         }
@@ -147,10 +171,10 @@ export function AppShell() {
           </div>
         </main>
 
-        {detail && kind && clusterId && (
+        {detail && selectedKind && clusterId && (
           <DetailDrawer
             object={detail}
-            kind={kind}
+            kind={selectedKind}
             clusterId={clusterId}
             onClose={() => setSelected(null)}
           />
