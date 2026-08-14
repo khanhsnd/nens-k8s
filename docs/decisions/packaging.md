@@ -22,8 +22,10 @@ copy lives and overwrites it is an app that will one day overwrite the wrong thi
 only when that is true, and makes **Release notes** the primary button otherwise — so the same
 section is honest on all three without a platform check in the view.
 
-The Linux build links against WebKit2GTK **4.1** (`-tags webkit2_41`), which is what current
-distributions ship. A distribution with only 4.0 needs a build without that tag.
+The Linux build links against WebKit2GTK **4.0**, Wails' default, built on `ubuntu-22.04` — the last
+runner image that carries `libwebkit2gtk-4.0-dev`. A distribution that ships only 4.1 (Ubuntu 24.04
+and later) needs `wails build -tags webkit2_41` against `libwebkit2gtk-4.1-dev` instead, which is a
+second asset nobody has asked for yet.
 
 ### wails.json is the only place a version is written
 
@@ -37,6 +39,13 @@ plain `wails build` would then ship a binary whose version says `dev` while its 
 
 The release workflow rewrites `info.productVersion` from the tag before building, so the tag is what
 ends up everywhere. A tree built by hand keeps whatever the file says.
+
+Each build command also carries `-ldflags "-X main.version=$version"`, which does nothing here:
+`main.go` has a `version()` function reading the embedded config, not a `main.version` variable, and
+the linker drops an `-X` for a symbol that does not exist without complaining. It is kept so the
+three release workflows in this family read alike; the stamping step above it is what actually sets
+the version. Should a `var version string` ever appear in `main.go`, it would silently become a
+second source of truth — delete the flag rather than the stamping step.
 
 `SettingsAPI.Version()` hands that string to the frontend. The status bar shows `Nens <version>`, and
 `dev` is what the browser preview and an unstamped build report.
@@ -110,17 +119,25 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` runs `go test ./internal/...` on each of `windows-2025`, `macos-15`
-and `ubuntu-24.04`, stamps `wails.json` from the tag, builds that platform's asset, and a fourth job
-collects all three, writes one `checksums.txt` over them and publishes the release. The repository is
-public, so the app reads that feed unauthenticated and no token is involved — the default
-`GITHUB_TOKEN` with `contents: write` is all the workflow needs.
+`.github/workflows/release.yml` stamps `wails.json` from the tag on `windows-latest`, `macos-14` and
+`ubuntu-22.04`, builds that platform's asset, and a fourth job collects all three, writes one
+`checksums.txt` over them and publishes the release. The repository is public, so the app reads that
+feed unauthenticated and no token is involved — the default `GITHUB_TOKEN` with `contents: write` is
+all the workflow needs.
 
-The Windows job unpacks a pinned NSIS zip from SourceForge onto PATH rather than `choco install nsis`.
-Chocolatey's community feed is a single host that rate-limits and times out on CI ranges — a 504 from
-it failed a release that had nothing wrong with it. The zip is the whole toolchain the installer
-needs: `project.nsi` and `wails_tools.nsh` include only stock headers (`MUI`, `x64`, `WinVer`,
-`FileFunc`) and no third-party plugin, so there is nothing Chocolatey was adding.
+The release does not run `go test`: a tag is pushed at a commit whose tests were already run, and a
+test job that only ever passes is a job that only ever costs minutes. Run them before tagging.
+
+The Windows job installs NSIS with `choco install nsis`, then finds `makensis.exe` under either
+Program Files directory and appends its folder to `GITHUB_PATH` — Chocolatey does not put it there
+itself. A separate step resolves `makensis.exe` and runs `/VERSION`, so a broken install fails on its
+own step instead of inside `wails build`.
+
+Downloading the NSIS zip from SourceForge was tried instead, after a Chocolatey 504 failed a release
+that had nothing wrong with it. It is worse: `downloads.sourceforge.net` answers with a mirror
+interstitial rather than the archive, and `Expand-Archive` then dies on an HTML file with an empty
+`OperationStopped` message that says nothing about what happened. Chocolatey fails loudly and rarely;
+the mirror fails silently and often. Retrying the release is the answer to a 504.
 
 ### The Homebrew Cask is written by the release, not maintained by hand
 
@@ -154,10 +171,11 @@ allowBuilds:
   esbuild: true
 ```
 
-It has to live there rather than in `package.json`'s `pnpm.onlyBuiltDependencies`: pnpm 11 ignores the
-`package.json` field and rewrites `pnpm-workspace.yaml` with an unanswered placeholder instead, which
-fails the same way. `allowBuilds` is read by both pnpm 10 and 11, so the CI pin and a newer local
-install agree.
+The same approval is spelled a second time in `package.json` as `pnpm.onlyBuiltDependencies`, and both
+have to stay. pnpm 11 reads only `allowBuilds` — it warns that the `package.json` field is ignored and
+rewrites `pnpm-workspace.yaml` with an unanswered placeholder if the key is missing, failing the same
+way. Older pnpm reads only the `package.json` field. CI installs whatever pnpm `corepack enable`
+resolves to, so it is not the place to find out which of the two a version wanted.
 
 Locally, each platform builds its own — the Windows one needs NSIS on PATH:
 
@@ -170,5 +188,5 @@ wails build -platform darwin/universal
 ```
 
 ```sh
-wails build -platform linux/amd64 -tags webkit2_41
+wails build -platform linux/amd64
 ```

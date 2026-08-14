@@ -71,11 +71,14 @@ xattr -dr com.apple.quarantine /Applications/nens.app
 
 ### Linux x64 — `nens-<version>-linux-x64.tar.gz`
 
-Needs GTK3 and WebKit2GTK 4.1. On Debian/Ubuntu:
+Needs GTK3 and WebKit2GTK 4.0. On Debian/Ubuntu:
 
 ```bash
-sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0
+sudo apt install libgtk-3-0 libwebkit2gtk-4.0-37
 ```
+
+Ubuntu 24.04 and later dropped that package — there build from source with
+`wails build -platform linux/amd64 -tags webkit2_41` against `libwebkit2gtk-4.1-dev`.
 
 Then unpack and run:
 

@@ -174,9 +174,10 @@ API server; both go through helm's kube client, which a fake cannot stand in for
   `info.productVersion` is the one place a version is written, embedded by `main.go` and stamped from
   the tag by `.github/workflows/release.yml`. See `decisions/packaging.md`.
 - Three platforms out of one tag: the release workflow builds the Windows NSIS installer, a universal
-  macOS `.app` zip and a Linux x64 tarball (WebKit2GTK 4.1), tests on each runner, and publishes them
-  under one `checksums.txt`. Only the Windows build installs its own update — `UpdateStatus.CanInstall`
-  is `runtime.GOOS == "windows"`, and the other two open the release page instead.
+  macOS `.app` zip and a Linux x64 tarball (WebKit2GTK 4.0), publishes them under one `checksums.txt`,
+  and rewrites the Homebrew Cask in `khanhsnd/homebrew-tap` from the macOS asset. Only the Windows
+  build installs its own update — `UpdateStatus.CanInstall` is `runtime.GOOS == "windows"`, and the
+  other two open the release page instead.
 - **Not done: code signing.** There is no certificate, so SmartScreen warns on a downloaded installer.
   `decisions/packaging.md` names the exact `signtool` step and where it plugs into `project.nsi`.
 
