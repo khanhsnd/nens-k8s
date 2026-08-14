@@ -158,6 +158,42 @@ func TestRemoveLeavesReferencedFilesAlone(t *testing.T) {
 	}
 }
 
+func TestAddFolderTakesEveryKubeconfigInside(t *testing.T) {
+	loader, store := newLoader(t)
+
+	dir := t.TempDir()
+	for _, name := range []string{"alpha.yaml", "beta.conf"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(sample), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("}not yaml{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := loader.Add(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("expected the two kubeconfigs, got %+v", files)
+	}
+	if len(store.paths) != 2 {
+		t.Errorf("settings track %v, want just the two kubeconfigs", store.paths)
+	}
+}
+
+func TestAddFolderWithoutAKubeconfigIsRejected(t *testing.T) {
+	loader, _ := newLoader(t)
+
+	if _, err := loader.Add(t.TempDir()); err == nil {
+		t.Error("an empty folder should be rejected")
+	}
+}
+
 func TestRejectsInputWithoutContexts(t *testing.T) {
 	loader, _ := newLoader(t)
 

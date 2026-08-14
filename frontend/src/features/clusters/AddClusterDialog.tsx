@@ -1,4 +1,4 @@
-import { FolderOpen, FolderSearch, Trash2 } from 'lucide-react'
+import { FileSearch, FolderOpen, FolderSearch, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { configDir, revealPath } from '@/features/settings/settings.api'
 import { cn } from '@/shared/lib/cn'
@@ -7,7 +7,7 @@ import { useClusters } from './cluster.store'
 import { useKubeconfigs } from './kubeconfig.store'
 
 const MODES = [
-  { id: 'file', label: 'From file' },
+  { id: 'file', label: 'From disk' },
   { id: 'paste', label: 'Paste' },
 ] as const
 
@@ -20,6 +20,7 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
   const busy = useKubeconfigs((s) => s.busy)
   const load = useKubeconfigs((s) => s.load)
   const pick = useKubeconfigs((s) => s.pick)
+  const pickFolder = useKubeconfigs((s) => s.pickFolder)
   const add = useKubeconfigs((s) => s.add)
   const paste = useKubeconfigs((s) => s.paste)
   const remove = useKubeconfigs((s) => s.remove)
@@ -37,8 +38,8 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
 
   if (!open) return null
 
-  const browse = async () => {
-    const picked = await pick()
+  const browse = async (dialog: () => Promise<string>) => {
+    const picked = await dialog()
     if (picked) setPath(picked)
   }
 
@@ -71,20 +72,34 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
         </div>
 
         {mode === 'file' ? (
-          <div className="flex gap-2">
-            <input
-              value={path}
-              onChange={(event) => setPath(event.target.value)}
-              placeholder="C:\Users\you\.kube\config"
-              className="flex-1 rounded-md border border-line bg-base px-2.5 py-1.5 font-mono text-sm text-text outline-none placeholder:text-faint focus:border-accent/60"
-            />
-            <button
-              onClick={() => void browse()}
-              className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
-            >
-              <FolderOpen className="size-3.5" />
-              Browse
-            </button>
+          <div className="space-y-1.5">
+            <div className="flex gap-2">
+              <input
+                value={path}
+                onChange={(event) => setPath(event.target.value)}
+                placeholder="C:\Users\you\.kube\config"
+                className="flex-1 rounded-md border border-line bg-base px-2.5 py-1.5 font-mono text-sm text-text outline-none placeholder:text-faint focus:border-accent/60"
+              />
+              <button
+                onClick={() => void browse(pick)}
+                title="Pick one kubeconfig file"
+                className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
+              >
+                <FileSearch className="size-3.5" />
+                File
+              </button>
+              <button
+                onClick={() => void browse(pickFolder)}
+                title="Pick a folder of kubeconfigs"
+                className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-raised hover:text-text"
+              >
+                <FolderOpen className="size-3.5" />
+                Folder
+              </button>
+            </div>
+            <p className="text-xs text-faint">
+              A folder adds every kubeconfig directly inside it; anything else in it is skipped.
+            </p>
           </div>
         ) : (
           <textarea

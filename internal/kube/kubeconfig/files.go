@@ -32,15 +32,56 @@ func (l *Loader) Files() []domain.KubeconfigFile {
 	return files
 }
 
-func (l *Loader) Add(path string) (domain.KubeconfigFile, error) {
+// Add references a kubeconfig where it lives. A folder adds every file directly
+// inside it that parses as a kubeconfig, so a directory of per-cluster files is
+// one action instead of one per file.
+func (l *Loader) Add(path string) ([]domain.KubeconfigFile, error) {
 	absolute, err := expand(path)
 	if err != nil {
-		return domain.KubeconfigFile{}, err
+		return nil, err
 	}
+
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		paths, err := kubeconfigsIn(absolute)
+		if err != nil {
+			return nil, err
+		}
+		return l.trackAll(paths)
+	}
+
 	if _, err := load(clientcmd.LoadFromFile(absolute)); err != nil {
-		return domain.KubeconfigFile{}, err
+		return nil, err
 	}
-	return l.track(absolute)
+	return l.trackAll([]string{absolute})
+}
+
+// kubeconfigsIn keeps only what parses — a folder holds notes, certificates and
+// caches next to the configs, and refusing the whole folder over one of them
+// would make the feature useless.
+func kubeconfigsIn(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	paths := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		if _, err := load(clientcmd.LoadFromFile(path)); err == nil {
+			paths = append(paths, path)
+		}
+	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no kubeconfig in %s", dir)
+	}
+	return paths, nil
 }
 
 func (l *Loader) Import(content string) (domain.KubeconfigFile, error) {
@@ -81,13 +122,31 @@ func (l *Loader) Remove(path string) error {
 }
 
 func (l *Loader) track(path string) (domain.KubeconfigFile, error) {
-	paths := l.settings.Kubeconfigs()
-	if !slices.Contains(paths, path) {
-		if err := l.settings.SetKubeconfigs(append(paths, path)); err != nil {
-			return domain.KubeconfigFile{}, err
+	files, err := l.trackAll([]string{path})
+	if err != nil {
+		return domain.KubeconfigFile{}, err
+	}
+	return files[0], nil
+}
+
+// trackAll saves the whole batch in one settings write — a folder of twenty
+// files should not rewrite settings.json twenty times.
+func (l *Loader) trackAll(paths []string) ([]domain.KubeconfigFile, error) {
+	tracked := l.settings.Kubeconfigs()
+	for _, path := range paths {
+		if !slices.Contains(tracked, path) {
+			tracked = append(tracked, path)
 		}
 	}
-	return l.describe(path, true), nil
+	if err := l.settings.SetKubeconfigs(tracked); err != nil {
+		return nil, err
+	}
+
+	files := make([]domain.KubeconfigFile, 0, len(paths))
+	for _, path := range paths {
+		files = append(files, l.describe(path, true))
+	}
+	return files, nil
 }
 
 func (l *Loader) describe(path string, removable bool) domain.KubeconfigFile {

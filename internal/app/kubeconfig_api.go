@@ -38,7 +38,14 @@ func (a *KubeconfigAPI) Pick() (string, error) {
 	})
 }
 
-func (a *KubeconfigAPI) Add(path string) (domain.KubeconfigFile, error) {
+func (a *KubeconfigAPI) PickFolder() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:            "Select a folder of kubeconfigs",
+		DefaultDirectory: defaultKubeDir(),
+	})
+}
+
+func (a *KubeconfigAPI) Add(path string) ([]domain.KubeconfigFile, error) {
 	return a.files.Add(path)
 }
 

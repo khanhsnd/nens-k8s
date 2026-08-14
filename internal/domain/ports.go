@@ -14,7 +14,8 @@ type KubeconfigSource interface {
 
 type KubeconfigFiles interface {
 	Files() []KubeconfigFile
-	Add(path string) (KubeconfigFile, error)
+	// Add references a file, or every kubeconfig directly inside a folder.
+	Add(path string) ([]KubeconfigFile, error)
 	Import(content string) (KubeconfigFile, error)
 	Remove(path string) error
 }

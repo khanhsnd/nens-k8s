@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Add, Import, List, Pick, Remove } from '@bindings/go/app/KubeconfigAPI'
+import { Add, Import, List, Pick, PickFolder, Remove } from '@bindings/go/app/KubeconfigAPI'
 import { useClusters } from './cluster.store'
 
 export type KubeconfigFile = {
@@ -15,6 +15,7 @@ type KubeconfigState = {
   busy: boolean
   load: () => Promise<void>
   pick: () => Promise<string>
+  pickFolder: () => Promise<string>
   add: (path: string) => Promise<boolean>
   paste: (content: string) => Promise<boolean>
   remove: (path: string) => Promise<void>
@@ -46,6 +47,19 @@ async function mutate(action: () => Promise<unknown>): Promise<boolean> {
   }
 }
 
+async function choose(dialog: () => Promise<string>): Promise<string> {
+  if (useClusters.getState().offline) {
+    useKubeconfigs.setState({ error: DESKTOP_ONLY })
+    return ''
+  }
+  try {
+    return await dialog()
+  } catch (error) {
+    useKubeconfigs.setState({ error: reason(error) })
+    return ''
+  }
+}
+
 export const useKubeconfigs = create<KubeconfigState>((set) => ({
   files: [],
   error: null,
@@ -60,18 +74,8 @@ export const useKubeconfigs = create<KubeconfigState>((set) => ({
     }
   },
 
-  pick: async () => {
-    if (useClusters.getState().offline) {
-      set({ error: DESKTOP_ONLY })
-      return ''
-    }
-    try {
-      return await Pick()
-    } catch (error) {
-      set({ error: reason(error) })
-      return ''
-    }
-  },
+  pick: () => choose(Pick),
+  pickFolder: () => choose(PickFolder),
 
   add: (path) => mutate(() => Add(path)),
   paste: (content) => mutate(() => Import(content)),

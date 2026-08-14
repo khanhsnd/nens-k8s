@@ -18,6 +18,10 @@ export function Pick() {
   return window['go']['app']['KubeconfigAPI']['Pick']();
 }
 
+export function PickFolder() {
+  return window['go']['app']['KubeconfigAPI']['PickFolder']();
+}
+
 export function Remove(arg1) {
   return window['go']['app']['KubeconfigAPI']['Remove'](arg1);
 }

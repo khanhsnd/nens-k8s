@@ -28,9 +28,24 @@ are just fields in the file.
 `Remove` deletes the file only when it sits inside that imported directory — a kubeconfig
 the user merely pointed at is never touched, only unreferenced.
 
+### A folder is the same `Add`, not a second entry point
+
+`Add` stats the path: a file is validated and tracked as before, a directory is read one
+level deep and every entry that `clientcmd` parses is tracked. So typing a folder path
+into the dialog works too, and there is one code path to keep honest. Entries that do not
+parse are skipped rather than failing the whole folder — a `~/.kube` holds caches,
+certificates and notes next to the configs — but a folder with nothing usable is an error,
+otherwise "added" would mean nothing happened. Recursion is deliberately not done: the
+cache directories under `~/.kube` are exactly what a recursive walk would drag in.
+
+`trackAll` writes the batch to settings once; `track` is now a one-element call into it,
+so `Import` keeps its old behaviour.
+
 ### The native file dialog lives in `internal/app`
 
-`KubeconfigAPI.Pick` calls `runtime.OpenFileDialog`. `internal/app` is the Wails edge, so
+`KubeconfigAPI.Pick` calls `runtime.OpenFileDialog` and `PickFolder`
+`runtime.OpenDirectoryDialog` — the native dialogs pick one or the other, never both,
+which is why the UI has two browse buttons feeding one path field. `internal/app` is the Wails edge, so
 the import belongs there; a webview `<input type="file">` cannot give an absolute path,
 and reading the contents instead would turn "point at my kubeconfig" into a silent copy
 that goes stale.
