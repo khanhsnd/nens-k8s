@@ -4,6 +4,7 @@ import { openLogsTool, openNodeShellTool, openShellTool } from '@/features/dock/
 import { cn } from '@/shared/lib/cn'
 import { copyText } from '@/shared/lib/clipboard'
 import { Dialog } from '@/shared/ui/Dialog'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { Tooltip } from '@/shared/ui/Tooltip'
 import type { Kind } from './kinds'
 import { deleteObject, scaleObject } from './object.api'
@@ -62,7 +63,7 @@ function DeleteDialog({
           {target.namespace ? `${target.gvr.resource} in ${target.namespace}` : target.gvr.resource}{' '}
           — this cannot be undone.
         </p>
-        {error && <p className="font-mono text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} className="font-mono" />}
 
         <div className="flex justify-end gap-2">
           <button
@@ -123,7 +124,7 @@ function ScaleDialog({
           />
         </label>
         <p className="text-xs text-faint">Currently {current}.</p>
-        {error && <p className="font-mono text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} className="font-mono" />}
 
         <div className="flex justify-end gap-2 pt-1">
           <button

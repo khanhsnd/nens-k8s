@@ -1,6 +1,7 @@
 import { Download, ExternalLink, RefreshCw } from 'lucide-react'
 import { useEffect } from 'react'
 import { cn } from '@/shared/lib/cn'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { useUpdates } from './update.store'
 import type { UpdateStatus } from './update.types'
 
@@ -53,7 +54,7 @@ export function UpdateSection() {
         </button>
       </div>
 
-      {error && <p className="pt-1.5 text-2xs text-danger">{error}</p>}
+      {error && <ErrorText message={error} className="pt-1.5 text-2xs" />}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { GitCompareArrows, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { age } from '@/shared/lib/format'
 import { Dialog } from '@/shared/ui/Dialog'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { Placeholder } from '@/shared/ui/Placeholder'
 import { historyOf } from './helm.api'
 import { useHelm } from './helm.store'
@@ -40,7 +41,7 @@ function RollbackDialog({
           Helm re-applies what revision {revision} deployed and records the result as a new
           revision, so the history is kept either way.
         </p>
-        {error && <p className="font-mono text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} className="font-mono" />}
 
         <div className="flex justify-end gap-2">
           <button

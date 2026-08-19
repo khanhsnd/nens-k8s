@@ -5,6 +5,7 @@ import { copyText } from '@/shared/lib/clipboard'
 import { age } from '@/shared/lib/format'
 import { CodeEditor } from '@/shared/ui/CodeEditor'
 import { Dialog } from '@/shared/ui/Dialog'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { Field } from '@/shared/ui/Field'
 import { usePanelSize } from '@/shared/ui/panel.size'
 import { Placeholder } from '@/shared/ui/Placeholder'
@@ -48,7 +49,7 @@ function UninstallDialog({
           Helm deletes every resource this release owns in {target.namespace}, and its history with
           them. This cannot be undone.
         </p>
-        {error && <p className="font-mono text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} className="font-mono" />}
 
         <div className="flex justify-end gap-2">
           <button

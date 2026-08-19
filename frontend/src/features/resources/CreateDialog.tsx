@@ -3,6 +3,7 @@ import { parse } from 'yaml'
 import { useClusters } from '@/features/clusters/cluster.store'
 import { CodeEditor } from '@/shared/ui/CodeEditor'
 import { Dialog } from '@/shared/ui/Dialog'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import type { Kind } from './kinds'
 import { applyObject } from './object.api'
 import type { K8sObject } from './resource.types'
@@ -81,7 +82,7 @@ export function CreateDialog({
       </div>
 
       <div className="space-y-3 p-4">
-        {error && <p className="font-mono text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} className="font-mono" />}
 
         <div className="flex items-center justify-end gap-2">
           <span className="mr-auto text-xs text-faint">

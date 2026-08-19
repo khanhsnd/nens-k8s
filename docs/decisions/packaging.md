@@ -85,6 +85,14 @@ update", because the two are different problems.
 A build reporting `dev` never touches the network. A local tree offering to replace itself with a
 published installer is a way to lose uncommitted work.
 
+`http.Client.Timeout` counts the response body, so the one 30s cap that was right for the release
+JSON also cut the installer off part-way through and reported *context deadline exceeded
+(Client.Timeout or context cancellation while reading body)* — which reads like a dead network on a
+link that was working fine. The cap now sits where nothing is being transferred: the transport bounds
+the dial, the TLS handshake and the wait for response headers, and each call puts its own deadline on
+its own context — 30s for the release JSON and `checksums.txt`, 30 minutes for the installer. Putting
+a `Timeout` back on the client is one number for two bodies that are five orders of magnitude apart.
+
 `UpdateAPI.Install` starts the installer through the shell rather than `exec.Command`: NSIS's
 manifest asks for administrator, and `CreateProcess` refuses such a program outright instead of
 prompting. Only `ShellExecute` with the `runas` verb raises the elevation prompt, and declining it

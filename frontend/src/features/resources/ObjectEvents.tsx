@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { age } from '@/shared/lib/format'
 import { Dot } from '@/shared/ui/Badge'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { listEvents } from './object.api'
 import type { EventRecord, ResourceRef } from './resource.types'
 
@@ -22,7 +23,7 @@ export function ObjectEvents({ target }: { target: ResourceRef }) {
     }
   }, [target])
 
-  if (error) return <div className="p-4 text-sm text-danger">{error}</div>
+  if (error) return <ErrorText message={error} className="p-4 text-sm" />
   if (!records) return <div className="p-4 text-sm text-faint">Loading events…</div>
   if (records.length === 0) return <div className="p-4 text-sm text-faint">No events</div>
 

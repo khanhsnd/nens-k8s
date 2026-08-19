@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -23,6 +24,8 @@ const (
 	checksumsName = "checksums.txt"
 	development   = "dev"
 	requestLimit  = 30 * time.Second
+	downloadLimit = 30 * time.Minute
+	connectLimit  = 15 * time.Second
 	checksumLimit = 1 << 20
 )
 
@@ -36,7 +39,7 @@ type Feed struct {
 
 func NewFeed(version string) *Feed {
 	return &Feed{
-		client:  &http.Client{Timeout: requestLimit},
+		client:  &http.Client{Transport: transport()},
 		url:     releasesURL,
 		version: version,
 	}
@@ -97,6 +100,9 @@ func (f *Feed) Download(ctx context.Context) (string, error) {
 }
 
 func (f *Feed) latest(ctx context.Context) (release, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestLimit)
+	defer cancel()
+
 	response, err := f.get(ctx, f.url, "application/vnd.github+json")
 	if err != nil {
 		return release{}, fmt.Errorf("read the latest release: %w", err)
@@ -141,6 +147,9 @@ func (f *Feed) save(ctx context.Context, latest release) (string, error) {
 		return "", err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, downloadLimit)
+	defer cancel()
+
 	response, err := f.get(ctx, latest.installer, "")
 	if err != nil {
 		return "", fmt.Errorf("download the installer: %w", err)
@@ -158,17 +167,21 @@ func (f *Feed) save(ctx context.Context, latest release) (string, error) {
 	if closeErr := file.Close(); err == nil {
 		err = closeErr
 	}
-	if err == nil && !strings.EqualFold(hex.EncodeToString(sum.Sum(nil)), want) {
-		err = errors.New("the downloaded installer does not match the published checksum")
-	}
 	if err != nil {
 		_ = os.Remove(path)
-		return "", err
+		return "", fmt.Errorf("download the installer: %w", err)
+	}
+	if !strings.EqualFold(hex.EncodeToString(sum.Sum(nil)), want) {
+		_ = os.Remove(path)
+		return "", errors.New("the downloaded installer does not match the published checksum")
 	}
 	return path, nil
 }
 
 func (f *Feed) checksum(ctx context.Context, latest release) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestLimit)
+	defer cancel()
+
 	response, err := f.get(ctx, latest.checksums, "")
 	if err != nil {
 		return "", fmt.Errorf("download %s: %w", checksumsName, err)
@@ -208,6 +221,19 @@ func (f *Feed) get(ctx context.Context, url string, accept string) (*http.Respon
 		return nil, errors.New(response.Status)
 	}
 	return response, nil
+}
+
+// Nothing caps the whole exchange: an http.Client.Timeout counts the body too, so
+// a 30s one fires part-way through an installer of tens of megabytes and reports a
+// context deadline instead of a download. What is capped here is the part that can
+// hang without transferring anything — the connection and the wait for headers —
+// and each call gives its own body the deadline that body deserves.
+func transport() *http.Transport {
+	carrier := http.DefaultTransport.(*http.Transport).Clone()
+	carrier.DialContext = (&net.Dialer{Timeout: connectLimit}).DialContext
+	carrier.TLSHandshakeTimeout = connectLimit
+	carrier.ResponseHeaderTimeout = requestLimit
+	return carrier
 }
 
 type release struct {

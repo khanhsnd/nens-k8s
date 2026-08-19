@@ -224,3 +224,12 @@ func TestIsNewer(t *testing.T) {
 		t.Error("a version that cannot be parsed should be an error, not a false")
 	}
 }
+
+// A client timeout counts the body, so a 30s one cuts an installer of tens of
+// megabytes off part-way through and reports a context deadline instead. The
+// deadline belongs on each call's context, never on the client.
+func TestTheClientDoesNotCapTheWholeExchange(t *testing.T) {
+	if timeout := NewFeed("0.1.0").client.Timeout; timeout != 0 {
+		t.Errorf("client timeout = %s, want the body left uncapped", timeout)
+	}
+}

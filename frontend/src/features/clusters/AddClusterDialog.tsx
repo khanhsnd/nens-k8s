@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { configDir, revealPath } from '@/features/settings/settings.api'
 import { cn } from '@/shared/lib/cn'
 import { Dialog } from '@/shared/ui/Dialog'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { useClusters } from './cluster.store'
 import { useKubeconfigs } from './kubeconfig.store'
 
@@ -129,7 +130,7 @@ export function AddClusterDialog({ open, onClose }: { open: boolean; onClose: ()
           </p>
         )}
 
-        {error && <p className="text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} />}
         {offline && !error && (
           <p className="text-xs text-warn">
             Managing kubeconfigs needs the desktop app — the browser preview has no bridge.

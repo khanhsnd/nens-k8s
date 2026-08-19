@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { copyText } from '@/shared/lib/clipboard'
 import { Dialog } from '@/shared/ui/Dialog'
+import { ErrorText } from '@/shared/ui/ErrorText'
 import { useClusters } from './cluster.store'
 import type { Cluster } from './cluster.types'
 
@@ -75,7 +76,7 @@ export function ClusterSettingsDialog({
           })}
         </dl>
 
-        {error && <p className="text-xs text-danger">{error}</p>}
+        {error && <ErrorText message={error} />}
 
         <div className="flex justify-end gap-2 pt-1">
           <button
