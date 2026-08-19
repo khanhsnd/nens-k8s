@@ -3,8 +3,10 @@ package forward
 import (
 	"context"
 	"errors"
+	"io"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -151,6 +153,7 @@ func newRegistry(t *testing.T, fail error, objects ...runtime.Object) (*Registry
 		_ []string,
 		stop <-chan struct{},
 		ready chan struct{},
+		_ io.Writer,
 	) (tunnel, error) {
 		return &pipe{stop: stop, ready: ready, local: 34567, fail: fail}, nil
 	}
@@ -270,6 +273,83 @@ func TestRestoreSkipsOtherClusters(t *testing.T) {
 	restored, err := registry.Restore(context.Background(), "test")
 	if err != nil || len(restored) != 0 {
 		t.Errorf("restored = %+v, err = %v, want nothing", restored, err)
+	}
+}
+
+func TestRestoreReportsWhatItCouldNotBringBack(t *testing.T) {
+	registry, _, _ := newRegistry(t, nil, podObject("api-1", "Pending"))
+	spec := domain.ForwardSpec{Ref: ref("pods", "api-1"), LocalPort: 34567, RemotePort: 8080}
+	_ = registry.store.SetForwards([]domain.ForwardSpec{spec})
+
+	restored, err := registry.Restore(context.Background(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(restored) != 1 {
+		t.Fatalf("restored = %+v, want the failure reported as a record", restored)
+	}
+	if restored[0].Status != domain.ForwardError || restored[0].Error == "" {
+		t.Errorf("record = %+v, want an error the view can show", restored[0])
+	}
+	if restored[0].RemotePort != 8080 || restored[0].Name != "api-1" {
+		t.Errorf("record = %+v, want it to name the forward that failed", restored[0])
+	}
+	if remembered := saved(t, registry); len(remembered) != 1 {
+		t.Errorf("remembered = %+v, want the spec kept for the next connect", remembered)
+	}
+
+	again, err := registry.Restore(context.Background(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again) != 1 || again[0].ID != restored[0].ID {
+		t.Errorf("second restore = %+v, want the same record updated, not a second one", again)
+	}
+
+	if err := registry.Stop(restored[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if remembered := saved(t, registry); len(remembered) != 0 {
+		t.Errorf("remembered = %+v, want stopping the failed row to forget it", remembered)
+	}
+	if listed := registry.List(); len(listed) != 0 {
+		t.Errorf("List() = %+v, want the failed row gone", listed)
+	}
+}
+
+func TestAConnectionErrorLandsOnTheForwardWithoutEndingIt(t *testing.T) {
+	registry, bus, _ := newRegistry(t, nil, podObject("api-1", "Running"))
+
+	// The stream client-go writes its per-connection errors to, held so the test
+	// can write what a refused connection would have put there.
+	streams := make(chan io.Writer, 1)
+	dial := registry.dial
+	registry.dial = func(
+		conn *cluster.Connection,
+		namespace string,
+		pod string,
+		ports []string,
+		stop <-chan struct{},
+		ready chan struct{},
+		stream io.Writer,
+	) (tunnel, error) {
+		streams <- stream
+		return dial(conn, namespace, pod, ports, stop, ready, stream)
+	}
+
+	if _, err := registry.Start(context.Background(), ref("pods", "api-1"), 0, 8080); err != nil {
+		t.Fatal(err)
+	}
+	bus.next(t)
+
+	_, _ = (<-streams).Write([]byte("an error occurred forwarding 34567 -> 8080: connection refused\n"))
+
+	troubled := bus.next(t)
+	if troubled.Status != domain.ForwardActive {
+		t.Errorf("status = %q, want the tunnel left up", troubled.Status)
+	}
+	if !strings.Contains(troubled.Error, "connection refused") {
+		t.Errorf("error = %q, want the message client-go wrote", troubled.Error)
 	}
 }
 

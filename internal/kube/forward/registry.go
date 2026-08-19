@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"nens-k8s/internal/domain"
@@ -33,6 +34,18 @@ type tunnel interface {
 	GetPorts() ([]portforward.ForwardedPort, error)
 }
 
+// notes is the stream client-go writes its per-connection errors to — a
+// "connection refused" when nothing listens on the remote port. The tunnel
+// survives those, so the message lands on the row instead of ending it.
+type notes func(message string)
+
+func (n notes) Write(p []byte) (int, error) {
+	if message := strings.TrimSpace(string(p)); message != "" {
+		n(message)
+	}
+	return len(p), nil
+}
+
 type dialer func(
 	conn *cluster.Connection,
 	namespace string,
@@ -40,6 +53,7 @@ type dialer func(
 	ports []string,
 	stop <-chan struct{},
 	ready chan struct{},
+	notes io.Writer,
 ) (tunnel, error)
 
 type Registry struct {
@@ -109,7 +123,9 @@ func (r *Registry) Start(
 
 	ready := make(chan struct{})
 	ports := []string{fmt.Sprintf("%d:%d", localPort, remotePort)}
-	pipe, err := r.dial(conn, ref.Namespace, pod, ports, entry.stop, ready)
+	pipe, err := r.dial(conn, ref.Namespace, pod, ports, entry.stop, ready, notes(func(message string) {
+		r.trouble(entry, message)
+	}))
 	if err != nil {
 		return domain.PortForward{}, err
 	}
@@ -136,8 +152,7 @@ func (r *Registry) Start(
 // Restore starts every forward remembered for a cluster that is not already up.
 // It runs when a cluster connects, so a forward survives a restart of Nens.
 func (r *Registry) Restore(ctx context.Context, clusterID string) ([]domain.PortForward, error) {
-	started := make([]domain.PortForward, 0)
-	var failures []error
+	restored := make([]domain.PortForward, 0)
 
 	for _, spec := range r.store.Forwards() {
 		if spec.Ref.ClusterID != clusterID || r.live(spec) {
@@ -146,12 +161,61 @@ func (r *Registry) Restore(ctx context.Context, clusterID string) ([]domain.Port
 
 		meta, err := r.Start(ctx, spec.Ref, spec.LocalPort, spec.RemotePort)
 		if err != nil {
-			failures = append(failures, fmt.Errorf("%s/%s: %w", spec.Ref.Namespace, spec.Ref.Name, err))
-			continue
+			meta = r.unrestored(spec, err)
 		}
-		started = append(started, meta)
+		restored = append(restored, meta)
 	}
-	return started, errors.Join(failures...)
+	return restored, nil
+}
+
+// unrestored is a forward that could not come back. Restore runs on a connect
+// with nobody waiting on its return value, so the failure has to be a record the
+// view can show rather than an error the caller reads.
+//
+// It stays in the registry with no tunnel behind it, which is what makes Stop
+// able to forget its spec — otherwise a forward that fails every connect could
+// only be dropped by editing the settings file. The next connect updates that
+// same record instead of stacking a second one.
+func (r *Registry) unrestored(spec domain.ForwardSpec, err error) domain.PortForward {
+	slog.Warn("forward not restored",
+		"cluster", spec.Ref.ClusterID, "namespace", spec.Ref.Namespace,
+		"name", spec.Ref.Name, "remote", spec.RemotePort, "error", err)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	entry := r.failure(spec)
+	if entry == nil {
+		r.seq++
+		entry = &forward{
+			stop: make(chan struct{}),
+			spec: spec,
+			meta: domain.PortForward{
+				ID:         fmt.Sprintf("forward-%d", r.seq),
+				ClusterID:  spec.Ref.ClusterID,
+				Namespace:  spec.Ref.Namespace,
+				Resource:   spec.Ref.GVR.Resource,
+				Name:       spec.Ref.Name,
+				LocalPort:  spec.LocalPort,
+				RemotePort: spec.RemotePort,
+				Status:     domain.ForwardError,
+			},
+		}
+		r.forwards[entry.meta.ID] = entry
+	}
+
+	entry.meta.Error = err.Error()
+	return entry.meta
+}
+
+// failure finds the record left by an earlier failed restore of the same tunnel.
+func (r *Registry) failure(spec domain.ForwardSpec) *forward {
+	for _, entry := range r.forwards {
+		if entry.meta.Status == domain.ForwardError && entry.spec.SameTunnel(spec) {
+			return entry
+		}
+	}
+	return nil
 }
 
 func (r *Registry) List() []domain.PortForward {
@@ -181,12 +245,14 @@ func (r *Registry) Stop(id string) error {
 	return nil
 }
 
+// live ignores the records left by a failed restore: those are there to be seen
+// and stopped, not to stand in for a tunnel that never opened.
 func (r *Registry) live(spec domain.ForwardSpec) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	for _, entry := range r.forwards {
-		if entry.spec.SameTunnel(spec) {
+		if entry.meta.Status != domain.ForwardError && entry.spec.SameTunnel(spec) {
 			return true
 		}
 	}
@@ -220,7 +286,11 @@ func (r *Registry) activate(id string, entry *forward, pipe tunnel, ready chan s
 	}
 
 	ports, err := pipe.GetPorts()
-	if err != nil || len(ports) == 0 {
+	if err == nil && len(ports) == 0 {
+		err = errors.New("the tunnel reported no local port")
+	}
+	if err != nil {
+		r.finish(id, entry, err)
 		return
 	}
 
@@ -247,6 +317,22 @@ func (r *Registry) untilDisconnected(id string, entry *forward, connection conte
 		r.finish(id, entry, nil)
 	case <-entry.stop:
 	}
+}
+
+// trouble attaches the newest connection error to a forward that is still up,
+// so the view can show what a `curl` against it would have said.
+func (r *Registry) trouble(entry *forward, message string) {
+	r.mu.Lock()
+	if _, live := r.forwards[entry.meta.ID]; !live || entry.meta.Error == message {
+		r.mu.Unlock()
+		return
+	}
+	entry.meta.Error = message
+	meta := entry.meta
+	r.mu.Unlock()
+
+	slog.Warn("forward connection failed", "id", meta.ID, "error", message)
+	r.bus.Publish(event.TopicForwardChanged, meta)
 }
 
 // finish is the only teardown path: whoever gets there first reports the final
@@ -301,6 +387,7 @@ func dialSPDY(
 	ports []string,
 	stop <-chan struct{},
 	ready chan struct{},
+	stream io.Writer,
 ) (tunnel, error) {
 	transport, upgrader, err := spdy.RoundTripperFor(conn.RESTConfig())
 	if err != nil {
@@ -315,5 +402,5 @@ func dialSPDY(
 		URL()
 
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, endpoint)
-	return portforward.New(dialer, ports, stop, ready, io.Discard, io.Discard)
+	return portforward.New(dialer, ports, stop, ready, io.Discard, stream)
 }

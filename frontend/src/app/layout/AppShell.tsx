@@ -28,6 +28,7 @@ import { TOPOLOGY_KINDS } from '@/features/topology/topology.model'
 import { TopologyView, type Selection } from '@/features/topology/TopologyView'
 import { cn } from '@/shared/lib/cn'
 import { Placeholder } from '@/shared/ui/Placeholder'
+import { Toasts } from '@/shared/ui/Toasts'
 import { CommandPalette } from './CommandPalette'
 import { DetailDrawer } from './DetailDrawer'
 import { Sidebar } from './Sidebar'
@@ -182,6 +183,7 @@ export function AppShell() {
       <StatusBar />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <DiscardGuard />
+      <Toasts />
     </div>
   )
 }

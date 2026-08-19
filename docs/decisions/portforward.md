@@ -74,3 +74,36 @@ does not. The registry cannot drive that itself: it has no hook into `Connect`, 
 
 Restoring is exercised by the fake dynamic client only. Like the rest of phase 5, it has never run
 against a real API server.
+
+### A forward that fails has to say so where the user is, not where the row is
+
+Nothing about a forward's failure reaches the user by itself: the Port Forwarding tab is not the tab
+you are on when a tunnel breaks, and a restore runs on a connect with nobody watching its return
+value. So `shared/ui/toast.store` was added — a four-deep stack in the bottom-right corner — and
+`portforward.store.absorb` is the one door every record that arrives unasked goes through: a `error`
+that is new to that id raises a toast, then the record lands in the store as before. Records that
+answer a call the user is watching (`start`) keep throwing instead, and the caller toasts.
+
+A failure stays until it is dismissed, because the point of showing it is that the text can be read
+and copied; anything else fades after a few seconds. A `danger` toast also goes through
+`shared/lib/report`, so what the user saw is in `nens.log` too.
+
+### Three failures were invisible before that, and two of them were silent by construction
+
+- `portforward.New` was handed `io.Discard` for its error stream, which is where client-go writes the
+  per-connection errors — the `connection refused` you get when nothing listens on the remote port.
+  The tunnel survives those, so `trouble` attaches the newest message to the row and leaves the
+  status alone; the toast is `warn`, not `danger`.
+- `activate` returned quietly when `GetPorts()` failed, leaving the row at `starting` forever. It
+  finishes the forward with that error now.
+- `Restore` joined its failures into one error nobody rendered. Each one is a `PortForward` record in
+  the `error` state instead, so the failed forward is a row like any other.
+
+### An unrestored forward keeps a record in the registry, with no tunnel behind it
+
+`Stop` is the only path that forgets a spec, and it works off the registry entry — so a failed
+restore that left nothing behind would be a forward the user could only drop by editing
+`settings.json`. The record therefore lives in `r.forwards` with nothing hanging off it — no tunnel, no
+goroutines — which makes Stop dismiss the row and forget the spec in one click. `live` skips records
+in the `error` state so the next connect retries the spec, and `unrestored` updates that same record
+rather than stacking a second one.

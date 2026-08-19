@@ -2,6 +2,7 @@ import { Copy, Square } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ResourceRef } from '@/features/resources/resource.types'
 import { copyText } from '@/shared/lib/clipboard'
+import { notify } from '@/shared/ui/toast.store'
 import { listForwardPorts } from './portforward.api'
 import { ForwardStatusPill } from './portforward.columns'
 import { useForwards } from './portforward.store'
@@ -74,7 +75,6 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
   const [locals, setLocals] = useState<Record<string, string>>({})
   const [remote, setRemote] = useState('')
   const [busy, setBusy] = useState<number | null>(null)
-  const [failed, setFailed] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
@@ -82,7 +82,9 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
 
     listForwardPorts(target)
       .then((found) => live && setPorts(found))
-      .catch((error) => live && setFailed(String(error)))
+      .catch((error) =>
+        notify({ tone: 'danger', title: `No ports for ${target.name}`, detail: String(error) }),
+      )
 
     return () => {
       live = false
@@ -103,12 +105,15 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
 
   const forward = async (port: number, local: string) => {
     setBusy(port)
-    setFailed(null)
     try {
       await start(target, Number(local) || 0, port)
       setRemote('')
     } catch (error) {
-      setFailed(String(error))
+      notify({
+        tone: 'danger',
+        title: `Port forward failed — ${target.name}:${port}`,
+        detail: String(error),
+      })
     } finally {
       setBusy(null)
     }
@@ -173,8 +178,6 @@ export function ForwardPanel({ target }: { target: ResourceRef }) {
           }
         />
       </div>
-
-      {failed && <p className="font-mono text-xs text-danger">{failed}</p>}
     </div>
   )
 }

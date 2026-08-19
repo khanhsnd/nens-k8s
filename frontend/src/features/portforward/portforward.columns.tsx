@@ -1,6 +1,12 @@
+import { cn } from '@/shared/lib/cn'
 import { Dot, Pill, type Tone } from '@/shared/ui/Badge'
 import type { Column } from '@/shared/ui/DataGrid'
-import { forwardAddress, type ForwardStatus, type PortForward } from './portforward.types'
+import {
+  forwardAddress,
+  forwardTarget,
+  type ForwardStatus,
+  type PortForward,
+} from './portforward.types'
 
 export const FORWARD_TONES: Record<ForwardStatus, Tone> = {
   starting: 'info',
@@ -13,7 +19,7 @@ export function ForwardStatusPill({ forward }: { forward: PortForward }) {
   const tone = FORWARD_TONES[forward.status]
 
   return (
-    <Pill tone={tone}>
+    <Pill tone={tone} title={forward.error}>
       <Dot tone={tone} />
       {forward.status}
     </Pill>
@@ -27,10 +33,20 @@ export const FORWARD_COLUMNS: Column<PortForward>[] = [
     min: 160,
     grow: 1,
     fixed: true,
-    text: forwardAddress,
-    cell: (row) => (
-      <span className="font-mono font-medium text-accent">{forwardAddress(row)}</span>
-    ),
+    text: (row) => (row.localPort > 0 ? forwardAddress(row) : ''),
+    cell: (row) =>
+      row.localPort > 0 ? (
+        <span
+          className={cn(
+            'font-mono font-medium',
+            row.status === 'active' ? 'text-accent' : 'text-faint',
+          )}
+        >
+          {forwardAddress(row)}
+        </span>
+      ) : (
+        <span className="text-faint">—</span>
+      ),
   },
   {
     key: 'status',
@@ -45,7 +61,7 @@ export const FORWARD_COLUMNS: Column<PortForward>[] = [
     label: 'Target',
     min: 200,
     grow: 1.2,
-    text: (row) => `${row.resource}/${row.name}:${row.remotePort}`,
+    text: forwardTarget,
     cell: (row) => (
       <span>
         <span className="text-faint">{row.resource}/</span>

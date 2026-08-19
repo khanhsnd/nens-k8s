@@ -9,7 +9,6 @@ import { forwardAddress, type PortForward } from './portforward.types'
 
 export function PortForwardView() {
   const forwards = useForwards((state) => state.forwards)
-  const error = useForwards((state) => state.error)
   const stop = useForwards((state) => state.stop)
 
   const rows = useMemo(
@@ -17,19 +16,8 @@ export function PortForwardView() {
     [forwards],
   )
 
-  const notice = error && (
-    <div className="shrink-0 border-b border-line bg-raised px-3 py-1.5 text-xs text-danger">
-      {error}
-    </div>
-  )
-
   if (rows.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {notice}
-        <Placeholder label="No port forwards — open a pod, deployment or service and forward one" />
-      </div>
-    )
+    return <Placeholder label="No port forwards — open a pod, deployment or service and forward one" />
   }
 
   const actions = (row: PortForward) => (
@@ -53,7 +41,6 @@ export function PortForwardView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {notice}
       <DataGrid
         layoutId="portforward"
         rows={rows}

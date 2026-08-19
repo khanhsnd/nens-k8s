@@ -20,3 +20,6 @@ export type ForwardPort = {
 }
 
 export const forwardAddress = (forward: PortForward) => `localhost:${forward.localPort}`
+
+export const forwardTarget = (forward: PortForward) =>
+  `${forward.resource}/${forward.name}:${forward.remotePort}`

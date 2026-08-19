@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { EventsOn } from '@bindings/runtime/runtime'
 import type { ResourceRef } from '@/features/resources/resource.types'
+import { notify } from '@/shared/ui/toast.store'
 import { listForwards, restoreForwards, startForward, stopForward } from './portforward.api'
-import type { PortForward } from './portforward.types'
+import { forwardTarget, type PortForward } from './portforward.types'
 
 type ForwardState = {
   forwards: Record<string, PortForward>
-  error: string | null
   load: () => Promise<void>
   start: (ref: ResourceRef, localPort: number, remotePort: number) => Promise<PortForward>
   stop: (id: string) => Promise<void>
@@ -26,9 +26,27 @@ function apply(forwards: Record<string, PortForward>, forward: PortForward) {
   return next
 }
 
+/**
+ * Every record that arrives without a caller watching for it lands here — nobody
+ * is on the Port Forwarding tab when a tunnel breaks or a restore fails, so a
+ * problem that is new raises a toast on its way into the store.
+ */
+export function absorb(forward: PortForward) {
+  const previous = useForwards.getState().forwards[forward.id]
+
+  if (forward.error && forward.error !== previous?.error) {
+    const dead = forward.status === 'error'
+    notify({
+      tone: dead ? 'danger' : 'warn',
+      title: `Port forward ${dead ? 'failed' : 'error'} — ${forwardTarget(forward)}`,
+      detail: forward.error,
+    })
+  }
+  useForwards.setState((state) => ({ forwards: apply(state.forwards, forward) }))
+}
+
 export const useForwards = create<ForwardState>((set) => ({
   forwards: {},
-  error: null,
 
   load: async () => {
     const listed = await listForwards()
@@ -60,13 +78,13 @@ export const useForwards = create<ForwardState>((set) => ({
       restored.add(clusterId)
 
       try {
-        const back = await restoreForwards(clusterId)
-        set((state) => ({
-          forwards: back.reduce(apply, state.forwards),
-          error: null,
-        }))
+        for (const forward of await restoreForwards(clusterId)) absorb(forward)
       } catch (error) {
-        set({ error: String(error) })
+        notify({
+          tone: 'danger',
+          title: `Port forwards not restored — ${clusterId}`,
+          detail: String(error),
+        })
       }
     }
   },
@@ -74,9 +92,7 @@ export const useForwards = create<ForwardState>((set) => ({
 
 export function subscribeForwardEvents() {
   try {
-    return EventsOn('forward:changed', (forward: PortForward) => {
-      useForwards.setState((state) => ({ forwards: apply(state.forwards, forward) }))
-    })
+    return EventsOn('forward:changed', absorb)
   } catch {
     return () => {}
   }
